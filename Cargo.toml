@@ -1,0 +1,9 @@
+[package]
+
+name = "go_mcts"
+version = "0.0.1"
+authors = [ "Julian Schrittwieser <mcts@furidamu.org>" ]
+
+[dependencies]
+
+rand="*"
