@@ -4,7 +4,7 @@ use "random"
 actor Main
   new create(env: Env) =>
     try
-      let go = Go.create(9)
+      let go = Go.create(19)
       let rng = MT
 
       var color: Stone = Black
@@ -14,20 +14,21 @@ actor Main
         if moves.size() > 0 then
           num_consecutive_passes = 0
           go.play(moves(rng.int(moves.size())), color)
-          env.out.print(go.string())
+         // env.out.print(go.string())
         else
           num_consecutive_passes = num_consecutive_passes + 1
-          if color is Black then
+          /*if color is Black then
             env.out.print("black passes")
           else
             env.out.print("white passes")
-          end
+          end*/
         end
         color = go.opponent(color)
         moves = go.possible_moves(color)
         let s: I32 = 100000
-        @usleep[I32](s)
+        //@usleep[I32](s)
       end
+      env.out.print(go.string())
     else
       env.out.print("error")
     end
@@ -43,7 +44,7 @@ class Vertex
   let y: U64
 
   new create(x': U64, y': U64) ? =>
-    if (x' < 0) or (x' >= 9) or (y' < 0) or (y' >= 9) then
+    if (x' < 0) or (x' >= 19) or (y' < 0) or (y' >= 19) then
       error
     end
     x = x'
@@ -102,6 +103,14 @@ class Go
       return false
     end
 
+    // Can definitely play if the placed stone will have at least one direct
+    // freedom,
+    for n in neighbours(vertex).values() do
+      if stoneAt(n) is Empty then
+        return true
+      end
+    end
+
     // Detect ko.
     let playout = clone()
     playout.play(vertex, stone, true)
@@ -113,14 +122,6 @@ class Go
       return false
     else
       _board(vertex.y)(vertex.x) = Empty
-    end
-
-    // Can definitely play if the placed stone will have at least one direct
-    // freedom,
-    for n in neighbours(vertex).values() do
-      if stoneAt(n) is Empty then
-        return true
-      end
     end
 
     // Don't allow to destroy real eyes.
