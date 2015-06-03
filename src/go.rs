@@ -79,7 +79,11 @@ impl GoGame {
 
     let mut hasher = hash::SipHasher::new();
     self.hash(&mut hasher);
-    self.past_position_hashes.insert(hasher.finish());
+    let hash = hasher.finish();
+    if !force && self.past_position_hashes.contains(&hash) {
+      println!("missed ko!");
+    }
+    self.past_position_hashes.insert(hash);
     return true;
   }
 
@@ -145,23 +149,22 @@ impl GoGame {
       return false;
     }
 
+    // Can definitely play if the placed stone will have at least one direct
+    // freedom (can't be ko).
+    for n in self.neighbours(vertex) {
+      if self.stone_at(n).is_none() {
+        return true;
+      }
+    }
+
     // Detect ko.
     let mut playout = self.clone();
     playout.play(stone, vertex, true);
-
     let mut hasher = hash::SipHasher::new();
     playout.hash(&mut hasher);
     if self.past_position_hashes.contains(&hasher.finish()) {
       // This board position already happened previously - ko!
       return false
-    }
-
-    // Can definitely play if the placed stone will have at least one direct
-    // freedom,
-    for n in self.neighbours(vertex) {
-      if self.stone_at(n).is_none() {
-        return true;
-      }
     }
 
     // Don't allow to destroy real eyes.

@@ -1,12 +1,13 @@
 extern crate rand;
 use rand::Rng;
+use rand::SeedableRng;
 extern crate time;
 
 mod go;
 
 fn main() {
   let mut game = go::GoGame::new(19);
-  let mut rng = rand::thread_rng();
+  let mut rng = rand::StdRng::from_seed(&[42]);
   let mut color_to_play = go::Stone::Black;
   let mut possible_moves = game.possible_moves(color_to_play);
   let mut num_consecutive_passes = 0;
