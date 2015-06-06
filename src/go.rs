@@ -3,8 +3,6 @@ extern crate rand;
 use rand::Rng;
 use std::fmt;
 use std::collections;
-use std::hash;
-use std::hash::{Hash, Hasher};
 
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
 pub enum Stone {
@@ -31,20 +29,21 @@ pub struct Vertex {
 pub struct GoGame {
   size: usize,
   board: Vec<Vec<Option<Stone>>>,
-  vertex_hashes: collections::HashMap<(Option<Stone>, Vertex), u64>,
+  vertex_hashes: Vec<u64>,
   past_position_hashes: collections::HashSet<u64>,
 }
 
 impl GoGame {
   pub fn new(size: usize) -> GoGame {
     let mut rng = rand::thread_rng();
-    let mut vertex_hashes = collections::HashMap::new();
+    let mut vertex_hashes = vec![0; 3 * size * size];
+
 
     for col in 0 .. size {
       for row in 0 .. size {
-        vertex_hashes.insert((None, Vertex{x: col, y: row}), rng.gen());
-        vertex_hashes.insert((Some(Stone::Black), Vertex{x: col, y: row}), rng.gen());
-        vertex_hashes.insert((Some(Stone::White), Vertex{x: col, y: row}), rng.gen());
+        vertex_hashes[0 * size * size + col + row * size] = rng.gen(); // None
+        vertex_hashes[1 * size * size + col + row * size] = rng.gen(); // Black
+        vertex_hashes[2 * size * size + col + row * size] = rng.gen(); // White
       }
     }
 
@@ -77,9 +76,7 @@ impl GoGame {
       });
     }
 
-    let mut hasher = hash::SipHasher::new();
-    self.hash(&mut hasher);
-    let hash = hasher.finish();
+    let hash = self.position_hash();
     if !force && self.past_position_hashes.contains(&hash) {
       println!("missed ko!");
     }
@@ -160,9 +157,7 @@ impl GoGame {
     // Detect ko.
     let mut playout = self.clone();
     playout.play(stone, vertex, true);
-    let mut hasher = hash::SipHasher::new();
-    playout.hash(&mut hasher);
-    if self.past_position_hashes.contains(&hasher.finish()) {
+    if self.past_position_hashes.contains(&playout.position_hash()) {
       // This board position already happened previously - ko!
       return false
     }
@@ -209,6 +204,21 @@ impl GoGame {
     }
     return moves;
   }
+
+  pub fn position_hash(&self) -> u64 {
+    let mut hash = 0;
+    for row in 0 .. self.size {
+      for col in 0 .. self.size {
+        let offset = match self.stone_at(self.vertex(col, row)) {
+          None => 0,
+          Some(Stone::Black) => 1,
+          Some(Stone::White) => 2,
+        };
+        hash = hash ^ self.vertex_hashes[offset * self.size * self.size + col + row * self.size];
+      }
+    }
+    return hash;
+  }
 }
 
 impl fmt::Display for GoGame {
@@ -238,16 +248,5 @@ impl fmt::Display for GoGame {
     }
 
     return write!(f, "");
-  }
-}
-
-impl hash::Hash for GoGame {
-  fn hash<H: hash::Hasher>(&self, state: &mut H) {
-    for row in 0 .. self.size {
-      for col in 0 .. self.size {
-        let v = self.vertex(col, row);
-        self.vertex_hashes.get(&(self.stone_at(v), v)).unwrap().hash(state);
-      }
-    }
   }
 }
