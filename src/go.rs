@@ -19,10 +19,33 @@ impl Stone {
   }
 }
 
-#[derive(Eq, Hash, PartialEq, Copy, Clone)]
+#[derive(Eq, Hash, PartialEq, Copy, Clone, Ord, PartialOrd)]
 pub struct Vertex {
   pub x: usize,
   pub y: usize,
+}
+
+impl fmt::Display for Vertex {
+  fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+    let column_labels = "ABCDEFGHIKLMNOPORSTU";
+    try!(write!(f, "{}", column_labels.chars().nth(self.x).unwrap()));
+    return write!(f, "{}", self.y + 1);
+  }
+}
+impl fmt::Debug for Vertex {
+  fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+    let column_labels = "ABCDEFGHIKLMNOPORSTU";
+    try!(write!(f, "{}", column_labels.chars().nth(self.x).unwrap()));
+    return write!(f, "{}", self.y + 1);
+  }
+}
+
+
+#[derive(Clone)]
+struct String {
+  color: Stone,
+  stones: Vec<Vertex>,
+  liberties: Vec<Vertex>,
 }
 
 #[derive(Clone)]
@@ -31,6 +54,9 @@ pub struct GoGame {
   board: Vec<Vec<Option<Stone>>>,
   vertex_hashes: Vec<u64>,
   past_position_hashes: collections::HashSet<u64>,
+  strings: collections::HashMap<u64, String>,
+  string_index: Vec<Vec<u64>>,
+  next_string_key: u64,
 }
 
 impl GoGame {
@@ -52,6 +78,9 @@ impl GoGame {
       board: vec![vec![None; size]; size],
       vertex_hashes: vertex_hashes,
       past_position_hashes: collections::HashSet::new(),
+      strings: collections::HashMap::new(),
+      string_index: vec![vec![0; size]; size],
+      next_string_key: 1,
     }
   }
 
@@ -67,11 +96,48 @@ impl GoGame {
       return false;
     }
 
+    let mut liberties = Vec::new();
+    for n in self.neighbours(vertex) {
+      if self.stone_at(n) == None {
+        liberties.push(n);
+      }
+    }
+    liberties.sort();
+
+    let string_key = self.next_string_key;
+    self.next_string_key += 1;
+    self.string_index[vertex.y][vertex.x] = string_key;
+    self.strings.insert(string_key, String{
+      color: stone,
+      stones: vec![vertex],
+      liberties: liberties,
+    });
+
     self.board[vertex.y][vertex.x] = Some(stone);
+    for n in self.neighbours(vertex) {
+      self.stone_at(n).map(|s| {
+        let liberties = &mut self.strings.entry(self.string_index[n.y][n.x]).or_insert_with(|| panic!()).liberties;
+        match liberties.binary_search(&vertex) {
+          Ok(i) => { liberties.remove(i); () },
+          Err(_) => (), // println!("expected {:?}, but has {:?}", vertex, liberties),
+        };
+      });
+    }
     for n in self.neighbours(vertex) {
       self.stone_at(n).map(|s| {
         if s == stone.opponent() && self.dead(n) {
           self.remove_group(n);
+        }
+      });
+    }
+    for n in self.neighbours(vertex) {
+      self.stone_at(n).map(|s| {
+         if s == stone {
+          if self.string(n).stones.len() > self.string(vertex).stones.len() {
+            self.join_groups(vertex, n);
+          } else {
+            self.join_groups(n, vertex);
+          }
         }
       });
     }
@@ -84,42 +150,71 @@ impl GoGame {
     return true;
   }
 
-  fn dead(&self, vertex: Vertex) -> bool {
-    for v in self.group(vertex) {
-      for n in self.neighbours(v) {
-        if self.stone_at(n).is_none() {
-          return false;
+  fn string(&self, vertex: Vertex) -> &String {
+    return &self.strings[&self.string_index[vertex.y][vertex.x]];
+  }
+
+  fn join_groups(&mut self, smaller: Vertex, larger: Vertex) {
+    let string_index = self.string_index[larger.y][larger.x];
+    let smaller_string_index = self.string_index[smaller.y][smaller.x];
+
+    if string_index == smaller_string_index {
+      return;
+    }
+
+    for l in self.string(smaller).liberties.clone() {
+      match self.strings[&string_index].liberties.binary_search(&l) {
+        Ok(_) => (),
+        Err(i) => self.strings.entry(string_index).or_insert_with(|| panic!()).liberties.insert(i, l),
+      };
+    }
+
+    for v in self.group(smaller) {
+      self.string_index[v.y][v.x] = string_index;
+      self.strings.entry(string_index).or_insert_with(|| panic!()).stones.push(v);
+    }
+
+    for row in 0 .. self.size {
+      for col in 0 .. self.size {
+        if self.string_index[row][col] == smaller_string_index {
+          panic!("smaller string index should not be present after join");
         }
       }
     }
-    return true;
+    self.strings.remove(&smaller_string_index);
+  }
+
+  fn liberties(&self, vertex: Vertex) -> &Vec<Vertex> {
+    return &self.string(vertex).liberties;
+  }
+
+  fn dead(&self, vertex: Vertex) -> bool {
+    return self.string(vertex).liberties.len() == 0;
   }
 
   fn remove_group(&mut self, vertex: Vertex) {
+    // self.strings.remove(&self.string_index[vertex.y][vertex.x]);
     for v in self.group(vertex) {
-      self.board[v.y][v.x] = None
-    }
-  }
+      self.board[v.y][v.x] = None;
+      self.string_index[v.y][v.x] = 0;
 
-  fn group(&self, vertex: Vertex) -> collections::HashSet<Vertex> {
-    let mut g = collections::HashSet::new();
-    let mut candidates = vec![vertex];
-    while !candidates.is_empty() {
-      let v = candidates.pop().unwrap();
-      g.insert(v);
       for n in self.neighbours(v) {
-        if self.stone_at(v) == self.stone_at(n) {
-          if !g.contains(&n) {
-            g.insert(n);
-            candidates.push(n);
-          }
-        }
+        self.stone_at(n).map(|_| {
+          let liberties = &mut self.strings.entry(self.string_index[n.y][n.x]).or_insert_with(|| panic!()).liberties;
+          match liberties.binary_search(&v) {
+            Ok(_) => (),
+            Err(i) => liberties.insert(i, v),
+          };
+        });
       }
     }
-    return g;
   }
 
-  fn stone_at(&self, vertex: Vertex) -> Option<Stone> {
+  fn group(&self, vertex: Vertex) -> Vec<Vertex> {
+    return self.string(vertex).stones.clone();
+  }
+
+  pub fn stone_at(&self, vertex: Vertex) -> Option<Stone> {
     return self.board[vertex.y][vertex.x]
   }
 
@@ -154,21 +249,16 @@ impl GoGame {
       }
     }
 
-    // Detect ko.
-    let mut playout = self.clone();
-    playout.play(stone, vertex, true);
-    if self.past_position_hashes.contains(&playout.position_hash()) {
-      // This board position already happened previously - ko!
-      return false
-    }
+    // For all checks below, the newly placed stone is completely surrounded by
+    // enemy and friendly stones.
 
     // Don't allow to destroy real eyes.
     let ns = self.neighbours(vertex);
     if self.stone_at(ns[0]) == Some(stone) {
       let mut real_eye = true;
-      let g = self.group(ns[0]);
+      let string_index = self.string_index[ns[0].y][ns[0].x];
       for n in ns {
-        if !g.contains(&n) {
+        if string_index != self.string_index[n.y][n.x] {
           real_eye = false;
         }
       }
@@ -177,19 +267,32 @@ impl GoGame {
       }
     }
 
+    // Detect ko.
+    let mut playout = self.clone();
+    playout.play(stone, vertex, true);
+    if self.past_position_hashes.contains(&playout.position_hash()) {
+      // This board position already happened previously - ko!
+      return false
+    }
+
     // Allow to play if the placed stone will kill at least one group.
-    self.board[vertex.y][vertex.x] = Some(stone);
     for n in self.neighbours(vertex) {
-      if self.stone_at(n) == Some(stone.opponent()) && self.dead(n) {
-        self.board[vertex.y][vertex.x] = None;
+      if self.stone_at(n) == Some(stone.opponent()) && self.string(n).liberties.len() == 1 &&
+          self.string(n).liberties.first() == Some(&vertex) {
+        return true;
+      }
+    }
+
+    // Allow to play if the placed stones connects to a group that still has at
+    // least one other liberty after connecting.
+    for n in self.neighbours(vertex) {
+      if self.stone_at(n) == Some(stone) && self.string(n).liberties.len() > 1 {
         return true;
       }
     }
 
     // Don't allow to play if the stone would be dead or kill its own group.
-    let can_play = !self.dead(vertex);
-    self.board[vertex.y][vertex.x] = None;
-    return can_play;
+    return false;
   }
 
   pub fn possible_moves(&mut self, stone: Stone) -> Vec<Vertex> {
@@ -250,3 +353,99 @@ impl fmt::Display for GoGame {
     return write!(f, "");
   }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::GoGame;
+    use super::Stone;
+    use super::Vertex;
+    use super::String;
+
+    #[test]
+    fn can_play_single_stone() {
+      let mut game = GoGame::new(9);
+      let v = Vertex{x: 2, y: 2};
+      game.play(Stone::Black, v, false);
+      let mut expected = vec![Vertex{x:2, y:1}, Vertex{x:1, y:2}, Vertex{x:3, y:2}, Vertex{x:2, y:3}];
+      expected.sort();
+      let mut got = game.liberties(v).clone();
+      got.sort();
+      assert_eq!(expected, got);
+    }
+
+    #[test]
+    fn can_remove_liberties() {
+      let mut game = GoGame::new(9);
+      game.play(Stone::Black, Vertex{x: 2, y: 2}, false);
+      game.play(Stone::White, Vertex{x: 3, y: 2}, false);
+      let mut expected = vec![Vertex{x:2, y:1}, Vertex{x:1, y:2}, Vertex{x:2, y:3}];
+      expected.sort();
+      let mut got = game.liberties(Vertex{x: 2, y: 2}).clone();
+      got.sort();
+      assert_eq!(expected, got);
+
+      let mut expected = vec![Vertex{x:3, y:1}, Vertex{x:3, y:3}, Vertex{x:4, y:2}];
+      expected.sort();
+      let mut got = game.liberties(Vertex{x: 3, y: 2}).clone();
+      got.sort();
+      assert_eq!(expected, got);
+    }
+
+    #[test]
+    fn can_join_strings() {
+      let mut game = GoGame::new(9);
+      let v = Vertex{x: 2, y: 2};
+      game.play(Stone::Black, Vertex{x: 2, y: 2}, false);
+      game.play(Stone::Black, Vertex{x: 3, y: 2}, false);
+      let mut expected = vec![Vertex{x:2, y:1}, Vertex{x:1, y:2}, Vertex{x:2, y:3},
+          Vertex{x:3, y:1}, Vertex{x:3, y:3}, Vertex{x:4, y:2}];
+      expected.sort();
+      let mut got = game.liberties(v).clone();
+      got.sort();
+      assert_eq!(expected, got);
+    }
+
+    #[test]
+    fn can_capture_single_stone() {
+      let mut game = GoGame::new(9);
+      game.play(Stone::White, Vertex{x: 2, y: 2}, false);
+      game.play(Stone::Black, Vertex{x: 1, y: 2}, false);
+      game.play(Stone::Black, Vertex{x: 3, y: 2}, false);
+      game.play(Stone::Black, Vertex{x: 2, y: 1}, false);
+      game.play(Stone::Black, Vertex{x: 2, y: 3}, false);
+      assert_eq!(0, game.liberties(Vertex{x: 2, y: 2}).len());
+      assert_eq!(None, game.stone_at(Vertex{x: 2, y: 2}));
+    }
+
+    #[test]
+    fn freedoms_after_capture() {
+      let mut game = GoGame::new(9);
+      game.play(Stone::White, Vertex{x: 0, y: 0}, false);
+      game.play(Stone::Black, Vertex{x: 1, y: 0}, false);
+      game.play(Stone::Black, Vertex{x: 1, y: 1}, false);
+      game.play(Stone::Black, Vertex{x: 0, y: 1}, false);
+      assert_eq!(0, game.liberties(Vertex{x: 0, y: 0}).len());
+      assert_eq!(None, game.stone_at(Vertex{x: 0, y: 0}));
+
+      let mut expected = vec![Vertex{x:0, y:0}, Vertex{x:0, y:2},
+          Vertex{x:1, y:2}, Vertex{x:2, y:0}, Vertex{x:2, y:1}];
+      assert_eq!(expected, game.liberties(Vertex{x: 0, y: 1}).clone());
+    }
+
+
+    #[test]
+    fn clone_test() {
+      let mut a = GoGame::new(19);
+      let b = a.clone();
+      a.strings.insert(0, String{
+        color: Stone::Black,
+        stones: vec![],
+        liberties: vec![],
+      });
+      assert_eq!(0, b.strings.len());
+      let c = a.clone();
+      a.strings.entry(0).or_insert_with(|| panic!()).stones.push(Vertex{x:0, y:0});
+      assert_eq!(0, c.strings[&0].stones.len());
+    }
+}
+

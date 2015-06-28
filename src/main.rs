@@ -20,16 +20,16 @@ fn main() {
       Some(m) => {
         num_consecutive_passes = 0;
         game.play(color_to_play, *m, false);
-        // println!("{}", game);
+        println!("{}", game);
       }
       None => {
         num_consecutive_passes += 1;
-        // println!("{:?} passes", color_to_play);
+        println!("{:?} passes", color_to_play);
       }
     }
     color_to_play = color_to_play.opponent();
     possible_moves = game.possible_moves(color_to_play);
-  //   std::thread::sleep_ms(500);
+    // std::thread::sleep_ms(100);
   }
   println!("{} moves in {}", num_moves, start.to(time::PreciseTime::now()));
 }
