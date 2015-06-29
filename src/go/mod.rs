@@ -59,7 +59,7 @@ pub struct GoGame {
   strings: collections::HashMap<u64, String>,
   string_index: Vec<Vec<u64>>,
   next_string_key: u64,
-  // timer: bench::Timer,
+  timer: bench::Timer,
 }
 
 impl GoGame {
@@ -84,7 +84,7 @@ impl GoGame {
       strings: collections::HashMap::new(),
       string_index: vec![vec![0; size]; size],
       next_string_key: 1,
-      // timer: bench::Timer::new(),
+      timer: bench::Timer::new(),
     }
   }
 
@@ -95,8 +95,12 @@ impl GoGame {
     }
   }
 
+  pub fn report(&self) {
+    self.timer.report();
+  }
+
   pub fn play(&mut self, stone: Stone, vertex: Vertex, force: bool) -> bool {
-    // self.timer.func("play");
+    self.timer.start("play");
     if !force && !self.can_play(stone, vertex) {
       return false;
     }
@@ -119,12 +123,13 @@ impl GoGame {
     });
 
     self.board[vertex.y][vertex.x] = Some(stone);
+    // Remove the vertex now occupied by this stone from the neighbor's liberties.
     for n in self.neighbours(vertex) {
-      self.stone_at(n).map(|s| {
+      self.stone_at(n).map(|_| {
         let liberties = &mut self.strings.entry(self.string_index[n.y][n.x]).or_insert_with(|| panic!()).liberties;
         match liberties.binary_search(&vertex) {
           Ok(i) => { liberties.remove(i); () },
-          Err(_) => (), // println!("expected {:?}, but has {:?}", vertex, liberties),
+          Err(_) => (),
         };
       });
     }
@@ -152,6 +157,7 @@ impl GoGame {
       println!("missed ko!");
     }
     self.past_position_hashes.insert(hash);
+    self.timer.end();
     return true;
   }
 
@@ -160,6 +166,7 @@ impl GoGame {
   }
 
   fn join_groups(&mut self, smaller: Vertex, larger: Vertex) {
+    self.timer.start("join_groups");
     let string_index = self.string_index[larger.y][larger.x];
     let smaller_string_index = self.string_index[smaller.y][smaller.x];
 
@@ -179,14 +186,8 @@ impl GoGame {
       self.strings.entry(string_index).or_insert_with(|| panic!()).stones.push(v);
     }
 
-    for row in 0 .. self.size {
-      for col in 0 .. self.size {
-        if self.string_index[row][col] == smaller_string_index {
-          panic!("smaller string index should not be present after join");
-        }
-      }
-    }
     self.strings.remove(&smaller_string_index);
+    self.timer.end();
   }
 
   fn liberties(&self, vertex: Vertex) -> &Vec<Vertex> {
@@ -194,25 +195,32 @@ impl GoGame {
   }
 
   fn dead(&self, vertex: Vertex) -> bool {
-    return self.string(vertex).liberties.len() == 0;
+    return self.string_index[vertex.y][vertex.x] == 0 ||
+        self.string(vertex).liberties.len() == 0;
   }
 
   fn remove_group(&mut self, vertex: Vertex) {
-    // self.strings.remove(&self.string_index[vertex.y][vertex.x]);
+    self.timer.start("remove_group");
+    let string_index = self.string_index[vertex.y][vertex.x];
     for v in self.group(vertex) {
       self.board[v.y][v.x] = None;
       self.string_index[v.y][v.x] = 0;
 
       for n in self.neighbours(v) {
         self.stone_at(n).map(|_| {
-          let liberties = &mut self.strings.entry(self.string_index[n.y][n.x]).or_insert_with(|| panic!()).liberties;
-          match liberties.binary_search(&v) {
-            Ok(_) => (),
-            Err(i) => liberties.insert(i, v),
-          };
+          let neighbour_string_i = self.string_index[n.y][n.x];
+          if (neighbour_string_i != string_index) {
+            let liberties = &mut self.strings.entry(neighbour_string_i).or_insert_with(|| panic!("remove_group")).liberties;
+            match liberties.binary_search(&v) {
+              Ok(_) => (),
+              Err(i) => liberties.insert(i, v),
+            };
+          }
         });
       }
     }
+    self.strings.remove(&string_index);
+    self.timer.end();
   }
 
   fn group(&self, vertex: Vertex) -> Vec<Vertex> {
@@ -241,8 +249,10 @@ impl GoGame {
   }
 
   pub fn can_play(&mut self, stone: Stone, vertex: Vertex) -> bool {
+    self.timer.start("can_play");
     // Can't play if the vertex is not empty.
     if !self.board[vertex.y][vertex.x].is_none() {
+      self.timer.end();
       return false;
     }
 
@@ -250,6 +260,7 @@ impl GoGame {
     // freedom (can't be ko).
     for n in self.neighbours(vertex) {
       if self.stone_at(n).is_none() {
+        self.timer.end();
         return true;
       }
     }
@@ -268,7 +279,17 @@ impl GoGame {
         }
       }
       if real_eye {
+        self.timer.end();
         return false;
+      }
+    }
+
+    // Allow to play if the placed stones connects to a group that still has at
+    // least one other liberty after connecting.
+    for n in self.neighbours(vertex) {
+      if self.stone_at(n) == Some(stone) && self.string(n).liberties.len() > 1 {
+        self.timer.end();
+        return true;
       }
     }
 
@@ -277,6 +298,7 @@ impl GoGame {
     playout.play(stone, vertex, true);
     if self.past_position_hashes.contains(&playout.position_hash()) {
       // This board position already happened previously - ko!
+      self.timer.end();
       return false
     }
 
@@ -284,17 +306,12 @@ impl GoGame {
     for n in self.neighbours(vertex) {
       if self.stone_at(n) == Some(stone.opponent()) && self.string(n).liberties.len() == 1 &&
           self.string(n).liberties.first() == Some(&vertex) {
+        self.timer.end();
         return true;
       }
     }
 
-    // Allow to play if the placed stones connects to a group that still has at
-    // least one other liberty after connecting.
-    for n in self.neighbours(vertex) {
-      if self.stone_at(n) == Some(stone) && self.string(n).liberties.len() > 1 {
-        return true;
-      }
-    }
+    self.timer.end();
 
     // Don't allow to play if the stone would be dead or kill its own group.
     return false;
@@ -326,7 +343,8 @@ impl GoGame {
     return moves;
   }
 
-  pub fn position_hash(&self) -> u64 {
+  pub fn position_hash(&mut self) -> u64 {
+    self.timer.start("position_hash");
     let mut hash = 0;
     for row in 0 .. self.size {
       for col in 0 .. self.size {
@@ -338,6 +356,7 @@ impl GoGame {
         hash = hash ^ self.vertex_hashes[offset * self.size * self.size + col + row * self.size];
       }
     }
+    self.timer.end();
     return hash;
   }
 }

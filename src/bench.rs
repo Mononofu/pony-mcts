@@ -3,35 +3,49 @@ extern crate time;
 use std::collections;
 
 #[derive(Clone)]
-pub struct Timer {
-  time_spent: collections::HashMap<String, time::Duration>,
-}
-
-pub struct FunctionScope<'a> {
-  parent: &'a mut Timer,
+pub struct FunctionScope {
   name: String,
   start: time::PreciseTime,
 }
 
-impl<'a> Drop for FunctionScope<'a> {
-  fn drop(&mut self) {
-    self.parent.update_time(self.name.clone(), self.start.to(time::PreciseTime::now()));
-  }
+#[derive(Clone)]
+pub struct Timer {
+  num_calls: collections::HashMap<String, u64>,
+  time_spent: collections::HashMap<String, time::Duration>,
+  active: Vec<FunctionScope>,
 }
+
 
 impl Timer {
   pub fn new() -> Timer {
     Timer{
+      num_calls: collections::HashMap::new(),
       time_spent: collections::HashMap::new(),
+      active: Vec::new(),
     }
   }
 
-  pub fn func<'a>(&'a mut self, name: &str) -> FunctionScope<'a> {
-    FunctionScope{
-      parent: self,
-      name: name.to_string(),
-      start: time::PreciseTime::now(),
+  pub fn report(&self) {
+    for (name, &duration) in self.time_spent.iter() {
+      println!("{:20}: {:4} calls in {}", name, self.num_calls[name], duration);
     }
+  }
+
+  pub fn start(&mut self, name: &str) {
+    // self.active.push(FunctionScope{
+    //   name: name.to_string(),
+    //   start: time::PreciseTime::now(),
+    // });
+  }
+
+  pub fn end(&mut self) {
+    // match self.active.pop() {
+    //   Some(FunctionScope{name: n, start: s}) => {
+    //     *self.num_calls.entry(n.clone()).or_insert(0) += 1;
+    //     self.update_time(n, s.to(time::PreciseTime::now()))
+    //   },
+    //   None => println!("No active function!"),
+    // }
   }
 
   fn update_time(&mut self, name: String, d: time::Duration) {
@@ -41,14 +55,5 @@ impl Timer {
       time::Duration::zero()
     };
     self.time_spent.insert(name, old + d);
-  }
-}
-
-impl Drop for Timer {
-  fn drop(&mut self) {
-    println!("execution trace:");
-    for (name, &duration) in self.time_spent.iter() {
-      println!("{}: {}", name, duration);
-    }
   }
 }

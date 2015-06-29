@@ -72,6 +72,12 @@ fn freedoms_after_capture() {
   assert_eq!(expected, game.liberties(Vertex{x: 0, y: 1}).clone());
 }
 
+#[test]
+fn initially_all_moves_possible() {
+  let mut game = GoGame::new(9);
+  assert_eq!(game.possible_moves(Stone::Black).len(), 81);
+}
+
 
 #[test]
 fn clone_test() {
