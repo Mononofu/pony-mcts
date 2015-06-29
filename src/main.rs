@@ -4,9 +4,10 @@ use rand::SeedableRng;
 extern crate time;
 
 mod go;
+mod bench;
 
 fn main() {
-  for _ in 0 .. 500 {
+  for _ in 0 .. 1 {
     play();
   }
 }
@@ -18,7 +19,7 @@ fn play() {
   let mut possible_moves = game.possible_moves(color_to_play);
   let mut num_consecutive_passes = 0;
   let mut num_moves = 0;
-  // let start = time::PreciseTime::now();
+  let start = time::PreciseTime::now();
 
   while num_consecutive_passes < 2 {
     num_moves += 1;
@@ -37,6 +38,6 @@ fn play() {
     possible_moves = game.possible_moves(color_to_play);
     // std::thread::sleep_ms(100);
   }
-  // println!("{} moves in {}", num_moves, start.to(time::PreciseTime::now()));
+  println!("{} moves in {}", num_moves, start.to(time::PreciseTime::now()));
   // println!("{}", game);
 }

@@ -4,6 +4,8 @@ use rand::Rng;
 use std::fmt;
 use std::collections;
 
+use bench;
+
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
 pub enum Stone {
   Black,
@@ -57,6 +59,7 @@ pub struct GoGame {
   strings: collections::HashMap<u64, String>,
   string_index: Vec<Vec<u64>>,
   next_string_key: u64,
+  // timer: bench::Timer,
 }
 
 impl GoGame {
@@ -81,6 +84,7 @@ impl GoGame {
       strings: collections::HashMap::new(),
       string_index: vec![vec![0; size]; size],
       next_string_key: 1,
+      // timer: bench::Timer::new(),
     }
   }
 
@@ -92,6 +96,7 @@ impl GoGame {
   }
 
   pub fn play(&mut self, stone: Stone, vertex: Vertex, force: bool) -> bool {
+    // self.timer.func("play");
     if !force && !self.can_play(stone, vertex) {
       return false;
     }
