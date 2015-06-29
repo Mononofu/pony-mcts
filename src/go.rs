@@ -240,7 +240,7 @@ impl GoGame {
     return ns;
   }
 
-  fn can_play(&mut self, stone: Stone, vertex: Vertex) -> bool {
+  pub fn can_play(&mut self, stone: Stone, vertex: Vertex) -> bool {
     // Can't play if the vertex is not empty.
     if !self.board[vertex.y][vertex.x].is_none() {
       return false;
@@ -298,6 +298,19 @@ impl GoGame {
 
     // Don't allow to play if the stone would be dead or kill its own group.
     return false;
+  }
+
+  pub fn empty_vertices(&self) -> Vec<Vertex>  {
+    let mut moves = Vec::new();
+    for row in 0 .. self.size {
+      for col in 0 .. self.size {
+        let v = self.vertex(row, col);
+        if self.board[v.y][v.x].is_none() {
+          moves.push(v);
+        }
+      }
+    }
+    return moves;
   }
 
   pub fn possible_moves(&mut self, stone: Stone) -> Vec<Vertex> {
