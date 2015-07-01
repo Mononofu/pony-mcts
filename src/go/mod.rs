@@ -56,6 +56,7 @@ pub struct GoGame {
   board: Vec<Vec<Option<Stone>>>,
   vertex_hashes: Vec<u64>,
   past_position_hashes: collections::HashSet<u64>,
+  position_hash: u64,
   strings: collections::HashMap<u64, String>,
   string_index: Vec<Vec<u64>>,
   next_string_key: u64,
@@ -69,9 +70,11 @@ impl GoGame {
     let mut vertex_hashes = vec![0; 3 * size * size];
 
 
+    let mut hash = 0;
     for col in 0 .. size {
       for row in 0 .. size {
         vertex_hashes[0 * size * size + col + row * size] = rng.gen(); // None
+        hash = hash ^ vertex_hashes[0 * size * size + col + row * size];
         vertex_hashes[1 * size * size + col + row * size] = rng.gen(); // Black
         vertex_hashes[2 * size * size + col + row * size] = rng.gen(); // White
       }
@@ -82,6 +85,7 @@ impl GoGame {
       board: vec![vec![None; size]; size],
       vertex_hashes: vertex_hashes,
       past_position_hashes: collections::HashSet::new(),
+      position_hash: hash,
       strings: collections::HashMap::new(),
       string_index: vec![vec![0; size]; size],
       next_string_key: 1,
@@ -95,6 +99,24 @@ impl GoGame {
       x: x,
       y: y,
     }
+  }
+
+  fn hash_for(&self, vertex: Vertex) -> u64 {
+    let offset = match self.stone_at(vertex) {
+      None => 0,
+      Some(Stone::Black) => 1,
+      Some(Stone::White) => 2,
+    };
+    return self.vertex_hashes[offset * self.size * self.size + vertex.x +
+        vertex.y * self.size];
+  }
+
+  fn set_stone(&mut self, stone: Option<Stone>, vertex: Vertex) {
+    // Remove hash for old stone.
+    self.position_hash = self.position_hash ^ self.hash_for(vertex);
+    // Place new stone and apply hash for it.
+    self.board[vertex.y][vertex.x] = stone;
+    self.position_hash = self.position_hash ^ self.hash_for(vertex);
   }
 
   pub fn report(&self) {
@@ -144,7 +166,7 @@ impl GoGame {
 
     self.timer.section("remove liberties");
 
-    self.board[vertex.y][vertex.x] = Some(stone);
+    self.set_stone(Some(stone), vertex);
     // Remove the vertex now occupied by this stone from the neighbor's liberties.
     for n in self.neighbours(vertex) {
       self.stone_at(n).map(|_| {
@@ -177,11 +199,10 @@ impl GoGame {
 
     self.timer.section("check ko");
 
-    let hash = self.position_hash();
-    if !force && self.past_position_hashes.contains(&hash) {
+    if !force && self.past_position_hashes.contains(&self.position_hash) {
       println!("missed ko!");
     }
-    self.past_position_hashes.insert(hash);
+    self.past_position_hashes.insert(self.position_hash);
     self.timer.end();
     return true;
   }
@@ -229,7 +250,7 @@ impl GoGame {
     self.timer.start("remove_group");
     let string_index = self.string_index[vertex.y][vertex.x];
     for v in self.group(vertex) {
-      self.board[v.y][v.x] = None;
+      self.set_stone(None, v);
       self.string_index[v.y][v.x] = 0;
 
       for n in self.neighbours(v) {
@@ -367,23 +388,6 @@ impl GoGame {
       }
     }
     return moves;
-  }
-
-  pub fn position_hash(&mut self) -> u64 {
-    self.timer.start("position_hash");
-    let mut hash = 0;
-    for row in 0 .. self.size {
-      for col in 0 .. self.size {
-        let offset = match self.stone_at(self.vertex(col, row)) {
-          None => 0,
-          Some(Stone::Black) => 1,
-          Some(Stone::White) => 2,
-        };
-        hash = hash ^ self.vertex_hashes[offset * self.size * self.size + col + row * self.size];
-      }
-    }
-    self.timer.end();
-    return hash;
   }
 }
 

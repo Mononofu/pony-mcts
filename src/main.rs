@@ -7,7 +7,7 @@ mod go;
 mod bench;
 
 fn main() {
-  let num_playouts = 1;
+  let num_playouts = 10000;
   let start = time::PreciseTime::now();
   let mut rng = rand::StdRng::from_seed(&[42]);
   let mut num_moves = 0u64;
@@ -51,7 +51,7 @@ fn play(rng: &mut rand::StdRng) -> u32 {
     // std::thread::sleep_ms(100);
   }
   // println!("{} moves", num_moves);
-  game.report();
+  // game.report();
   // println!("{}", game);
   return num_moves;
 }
