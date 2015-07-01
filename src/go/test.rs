@@ -6,9 +6,9 @@ use super::String;
 #[test]
 fn can_play_single_stone() {
   let mut game = GoGame::new(9);
-  let v = Vertex{x: 2, y: 2};
+  let v = GoGame::vertex(2, 2);
   game.play(Stone::Black, v, false);
-  let mut expected = vec![Vertex{x:2, y:1}, Vertex{x:1, y:2}, Vertex{x:3, y:2}, Vertex{x:2, y:3}];
+  let mut expected = vec![GoGame::vertex(2, 1), GoGame::vertex(1, 2), GoGame::vertex(3, 2), GoGame::vertex(2, 3)];
   expected.sort();
   let mut got = game.liberties(v).clone();
   got.sort();
@@ -18,17 +18,17 @@ fn can_play_single_stone() {
 #[test]
 fn can_remove_liberties() {
   let mut game = GoGame::new(9);
-  game.play(Stone::Black, Vertex{x: 2, y: 2}, false);
-  game.play(Stone::White, Vertex{x: 3, y: 2}, false);
-  let mut expected = vec![Vertex{x:2, y:1}, Vertex{x:1, y:2}, Vertex{x:2, y:3}];
+  game.play(Stone::Black, GoGame::vertex(2, 2), false);
+  game.play(Stone::White, GoGame::vertex(3, 2), false);
+  let mut expected = vec![GoGame::vertex(2, 1), GoGame::vertex(1, 2), GoGame::vertex(2, 3)];
   expected.sort();
-  let mut got = game.liberties(Vertex{x: 2, y: 2}).clone();
+  let mut got = game.liberties(GoGame::vertex(2, 2)).clone();
   got.sort();
   assert_eq!(expected, got);
 
-  let mut expected = vec![Vertex{x:3, y:1}, Vertex{x:3, y:3}, Vertex{x:4, y:2}];
+  let mut expected = vec![GoGame::vertex(3, 1), GoGame::vertex(3, 3), GoGame::vertex(4, 2)];
   expected.sort();
-  let mut got = game.liberties(Vertex{x: 3, y: 2}).clone();
+  let mut got = game.liberties(GoGame::vertex(3, 2)).clone();
   got.sort();
   assert_eq!(expected, got);
 }
@@ -36,11 +36,11 @@ fn can_remove_liberties() {
 #[test]
 fn can_join_strings() {
   let mut game = GoGame::new(9);
-  let v = Vertex{x: 2, y: 2};
-  game.play(Stone::Black, Vertex{x: 2, y: 2}, false);
-  game.play(Stone::Black, Vertex{x: 3, y: 2}, false);
-  let mut expected = vec![Vertex{x:2, y:1}, Vertex{x:1, y:2}, Vertex{x:2, y:3},
-      Vertex{x:3, y:1}, Vertex{x:3, y:3}, Vertex{x:4, y:2}];
+  let v = GoGame::vertex(2, 2);
+  game.play(Stone::Black, GoGame::vertex(2, 2), false);
+  game.play(Stone::Black, GoGame::vertex(3, 2), false);
+  let mut expected = vec![GoGame::vertex(2, 1), GoGame::vertex(1, 2), GoGame::vertex(2, 3),
+      GoGame::vertex(3, 1), GoGame::vertex(3, 3), GoGame::vertex(4, 2)];
   expected.sort();
   let mut got = game.liberties(v).clone();
   got.sort();
@@ -50,26 +50,29 @@ fn can_join_strings() {
 #[test]
 fn can_capture_single_stone() {
   let mut game = GoGame::new(9);
-  game.play(Stone::White, Vertex{x: 2, y: 2}, false);
-  game.play(Stone::Black, Vertex{x: 1, y: 2}, false);
-  game.play(Stone::Black, Vertex{x: 3, y: 2}, false);
-  game.play(Stone::Black, Vertex{x: 2, y: 1}, false);
-  game.play(Stone::Black, Vertex{x: 2, y: 3}, false);
-  assert_eq!(None, game.stone_at(Vertex{x: 2, y: 2}));
+  game.play(Stone::White, GoGame::vertex(2, 2), false);
+  game.play(Stone::Black, GoGame::vertex(1, 2), false);
+  game.play(Stone::Black, GoGame::vertex(3, 2), false);
+  game.play(Stone::Black, GoGame::vertex(2, 1), false);
+  game.play(Stone::Black, GoGame::vertex(2, 3), false);
+  assert_eq!(None, game.stone_at(GoGame::vertex(2, 2)));
 }
 
 #[test]
 fn freedoms_after_capture() {
   let mut game = GoGame::new(9);
-  game.play(Stone::White, Vertex{x: 0, y: 0}, false);
-  game.play(Stone::Black, Vertex{x: 1, y: 0}, false);
-  game.play(Stone::Black, Vertex{x: 1, y: 1}, false);
-  game.play(Stone::Black, Vertex{x: 0, y: 1}, false);
-  assert_eq!(None, game.stone_at(Vertex{x: 0, y: 0}));
+  game.play(Stone::White, GoGame::vertex(0, 0), false);
+  game.play(Stone::Black, GoGame::vertex(1, 0), false);
+  game.play(Stone::Black, GoGame::vertex(1, 1), false);
+  game.play(Stone::Black, GoGame::vertex(0, 1), false);
+  assert_eq!(None, game.stone_at(GoGame::vertex(0, 0)));
 
-  let mut expected = vec![Vertex{x:0, y:0}, Vertex{x:0, y:2},
-      Vertex{x:1, y:2}, Vertex{x:2, y:0}, Vertex{x:2, y:1}];
-  assert_eq!(expected, game.liberties(Vertex{x: 0, y: 1}).clone());
+  let mut expected = vec![GoGame::vertex(0, 0), GoGame::vertex(0, 2),
+      GoGame::vertex(1, 2), GoGame::vertex(2, 0), GoGame::vertex(2, 1)];
+  expected.sort();
+  let mut got = game.liberties(GoGame::vertex(0, 1)).clone();
+  got.sort();
+  assert_eq!(expected, got);
 }
 
 #[test]
@@ -90,7 +93,7 @@ fn clone_test() {
   });
   assert_eq!(0, b.strings.len());
   let c = a.clone();
-  a.strings.entry(0).or_insert_with(|| panic!()).stones.push(Vertex{x:0, y:0});
+  a.strings.entry(0).or_insert_with(|| panic!()).stones.push(GoGame::vertex(0, 0));
   assert_eq!(0, c.strings[&0].stones.len());
 }
 
