@@ -55,7 +55,7 @@ fn can_capture_single_stone() {
   game.play(Stone::Black, GoGame::vertex(3, 2), false);
   game.play(Stone::Black, GoGame::vertex(2, 1), false);
   game.play(Stone::Black, GoGame::vertex(2, 3), false);
-  assert_eq!(None, game.stone_at(GoGame::vertex(2, 2)));
+  assert_eq!(Stone::Empty, game.stone_at(GoGame::vertex(2, 2)));
 }
 
 #[test]
@@ -65,7 +65,7 @@ fn freedoms_after_capture() {
   game.play(Stone::Black, GoGame::vertex(1, 0), false);
   game.play(Stone::Black, GoGame::vertex(1, 1), false);
   game.play(Stone::Black, GoGame::vertex(0, 1), false);
-  assert_eq!(None, game.stone_at(GoGame::vertex(0, 0)));
+  assert_eq!(Stone::Empty, game.stone_at(GoGame::vertex(0, 0)));
 
   let mut expected = vec![GoGame::vertex(0, 0), GoGame::vertex(0, 2),
       GoGame::vertex(1, 2), GoGame::vertex(2, 0), GoGame::vertex(2, 1)];

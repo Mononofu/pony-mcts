@@ -73,9 +73,10 @@ impl Timer {
     }
     let fs = self.active.last().unwrap().clone();
     if let Some(n) = fs.section_name {
+      let duration = fs.section_start.to(time::PreciseTime::now());
       let name = format!("{} - {}", fs.name, n);
       *self.num_calls.entry(name.clone()).or_insert(0) += 1;
-      self.update_time(name, fs.section_start.to(time::PreciseTime::now()));
+      self.update_time(name, duration);
     }
   }
 

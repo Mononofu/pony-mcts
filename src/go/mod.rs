@@ -8,6 +8,7 @@ use bench;
 
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
 pub enum Stone {
+  Empty,
   Black,
   White,
   Border,
@@ -16,6 +17,7 @@ pub enum Stone {
 impl Stone {
   pub fn opponent(self) -> Stone {
     match self {
+      Stone::Empty => Stone::Empty,
       Stone::Black => Stone::White,
       Stone::White => Stone::Black,
       Stone::Border => Stone::Border,
@@ -61,7 +63,7 @@ struct String {
 #[derive(Clone)]
 pub struct GoGame {
   size: usize,
-  board: Vec<Option<Stone>>,
+  board: Vec<Stone>,
   vertex_hashes: Vec<u64>,
   past_position_hashes: collections::HashSet<u64>,
   position_hash: u64,
@@ -77,18 +79,18 @@ impl GoGame {
     let mut rng = rand::thread_rng();
 
 
-    let mut board = vec![Some(Stone::Border); 21 * 21];
+    let mut board = vec![Stone::Border; 21 * 21];
     let mut hash = 0;
     let mut vertex_hashes = vec![0; 3 * board.len()];
     for col in 0 .. size {
       for row in 0 .. size {
-        vertex_hashes[0 * size * size + col + row * size] = rng.gen(); // None
+        vertex_hashes[0 * size * size + col + row * size] = rng.gen(); // Empty
         vertex_hashes[1 * size * size + col + row * size] = rng.gen(); // Black
         vertex_hashes[2 * size * size + col + row * size] = rng.gen(); // White
         // Create initial board hash.
         hash = hash ^ vertex_hashes[0 * size * size + col + row * size];
         let Vertex(v) = GoGame::vertex(row as u16, col as u16);
-        board[v as usize] = None;
+        board[v as usize] = Stone::Empty;
       }
     }
 
@@ -112,16 +114,16 @@ impl GoGame {
 
   fn hash_for(&self, vertex: Vertex) -> u64 {
     let offset = match self.stone_at(vertex) {
-      None => 0,
-      Some(Stone::Black) => 1,
-      Some(Stone::White) => 2,
-      Some(Stone::Border) => 3,
+      Stone::Empty => 0,
+      Stone::Black => 1,
+      Stone::White => 2,
+      Stone::Border => 3,
     };
     let Vertex(v) = vertex;
     return self.vertex_hashes[offset * self.size * self.size + v as usize];
   }
 
-  fn set_stone(&mut self, stone: Option<Stone>, vertex: Vertex) {
+  fn set_stone(&mut self, stone: Stone, vertex: Vertex) {
     // Remove hash for old stone.
     self.position_hash = self.position_hash ^ self.hash_for(vertex);
     // Place new stone and apply hash for it.
@@ -142,7 +144,7 @@ impl GoGame {
 
     let mut liberties = Vec::new();
     for n in self.neighbours(vertex) {
-      if self.stone_at(n) == None {
+      if self.stone_at(n) == Stone::Empty {
         liberties.push(n);
       }
     }
@@ -160,25 +162,15 @@ impl GoGame {
 
     self.timer.section("join groups");
 
-    for n in self.neighbours(vertex) {
-      self.stone_at(n).map(|s| {
-         if s == stone {
-          if self.string(n).stones.len() > self.string(vertex).stones.len() {
-            self.join_groups(vertex, n);
-          } else {
-            self.join_groups(n, vertex);
-          }
-        }
-      });
-    }
+    self.check_neighbours_for_joining(vertex, stone);
 
     self.timer.section("remove liberties");
 
-    self.set_stone(Some(stone), vertex);
+    self.set_stone(stone, vertex);
     // Remove the vertex now occupied by this stone from the neighbor's liberties.
     for Vertex(n) in self.neighbours(vertex) {
       match self.stone_at(Vertex(n)) {
-        Some(Stone::Black) | Some(Stone::White) => {
+        Stone::Black | Stone::White => {
           let liberties = &mut self.strings.entry(self.string_index[n as usize]).or_insert_with(|| panic!()).liberties;
           match liberties.binary_search(&vertex) {
             Ok(i) => { liberties.remove(i); () },
@@ -194,15 +186,13 @@ impl GoGame {
     let mut single_capture = None;
     let mut num_captures = 0;
     for n in self.neighbours(vertex) {
-      self.stone_at(n).map(|s| {
-        if s == stone.opponent() && self.dead(n) {
-          if self.string(n).stones.len() == 1 {
-            single_capture = Some(n);
-          }
-          num_captures += 1;
-          self.remove_group(n);
+      if self.stone_at(n) == stone.opponent() && self.dead(n) {
+        if self.string(n).stones.len() == 1 {
+          single_capture = Some(n);
         }
-      });
+        num_captures += 1;
+        self.remove_group(n);
+      }
     }
     if num_captures == 1 {
       self.last_single_capture = single_capture;
@@ -216,6 +206,20 @@ impl GoGame {
     self.past_position_hashes.insert(self.position_hash);
     self.timer.end();
     return true;
+  }
+
+  fn check_neighbours_for_joining(&mut self, vertex: Vertex, stone: Stone) {
+    self.timer.start("check_neighbours_for_joining");
+    for n in self.neighbours(vertex) {
+      if self.stone_at(n) == stone {
+        if self.string(n).stones.len() > self.string(vertex).stones.len() {
+          self.join_groups(vertex, n);
+        } else {
+          self.join_groups(n, vertex);
+        }
+      }
+    }
+    self.timer.end();
   }
 
   fn string(&self, vertex: Vertex) -> &String {
@@ -266,20 +270,21 @@ impl GoGame {
     let Vertex(v) = vertex;
     let string_index = self.string_index[v as usize];
     for Vertex(v) in self.group(vertex) {
-      self.set_stone(None, Vertex(v));
+      self.set_stone(Stone::Empty, Vertex(v));
       self.string_index[v as usize] = 0;
 
       for Vertex(n) in self.neighbours(Vertex(v)) {
-        self.stone_at(Vertex(n)).map(|_| {
+        let stone = self.stone_at(Vertex(n));
+        if stone == Stone::White || stone == Stone::Black {
           let neighbour_string_i = self.string_index[n as usize];
-          if neighbour_string_i != 0 && neighbour_string_i != string_index {
+          if neighbour_string_i != string_index {
             let liberties = &mut self.strings.entry(neighbour_string_i).or_insert_with(|| panic!("remove_group")).liberties;
             match liberties.binary_search(&Vertex(v)) {
               Ok(_) => (),
               Err(i) => liberties.insert(i, Vertex(v)),
             };
           }
-        });
+        }
       }
     }
     self.strings.remove(&string_index);
@@ -290,7 +295,7 @@ impl GoGame {
     return self.string(vertex).stones.clone();
   }
 
-  pub fn stone_at(&self, vertex: Vertex) -> Option<Stone> {
+  pub fn stone_at(&self, vertex: Vertex) -> Stone {
     let Vertex(v) = vertex;
     return self.board[v as usize]
   }
@@ -303,7 +308,7 @@ impl GoGame {
   pub fn can_play(&mut self, stone: Stone, vertex: Vertex) -> bool {
     self.timer.start("can_play");
     // Can't play if the vertex is not empty.
-    if !self.stone_at(vertex).is_none() {
+    if self.stone_at(vertex) != Stone::Empty {
       self.timer.end();
       return false;
     }
@@ -311,7 +316,7 @@ impl GoGame {
     // Can definitely play if the placed stone will have at least one direct
     // freedom (can't be ko).
     for n in self.neighbours(vertex) {
-      if self.stone_at(n).is_none() {
+      if self.stone_at(n) == Stone::Empty {
         self.timer.end();
         return true;
       }
@@ -322,7 +327,7 @@ impl GoGame {
 
     // Don't allow to destroy real eyes.
     let ns = self.neighbours(vertex);
-    if self.stone_at(ns[0]) == Some(stone) {
+    if self.stone_at(ns[0]) == stone {
       let mut real_eye = true;
       let Vertex(ns0) = ns[0];
       let string_index = self.string_index[ns0 as usize];
@@ -340,7 +345,7 @@ impl GoGame {
     // Allow to play if the placed stones connects to a group that still has at
     // least one other liberty after connecting.
     for n in self.neighbours(vertex) {
-      if self.stone_at(n) == Some(stone) && self.string(n).liberties.len() > 1 {
+      if self.stone_at(n) == stone && self.string(n).liberties.len() > 1 {
         self.timer.end();
         return true;
       }
@@ -355,7 +360,7 @@ impl GoGame {
 
     // Allow to play if the placed stone will kill at least one group.
     for n in self.neighbours(vertex) {
-      if self.stone_at(n) == Some(stone.opponent()) && self.string(n).liberties.len() == 1 &&
+      if self.stone_at(n) == stone.opponent() && self.string(n).liberties.len() == 1 &&
           self.string(n).liberties.first() == Some(&vertex) {
         self.timer.end();
         return true;
@@ -375,7 +380,7 @@ impl GoGame {
       for col in 0 .. self.size {
         let vertex = GoGame::vertex(row as u16, col as u16);
         let Vertex(v) = vertex;
-        if self.board[v as usize].is_none() {
+        if self.board[v as usize] == Stone::Empty {
           moves.push(vertex);
         }
       }
@@ -411,8 +416,8 @@ impl fmt::Display for GoGame {
       try!(write!(f, " {:2} \x1b[43m\x1b[1;37m ", row + 1));
       for col in 0 .. self.size {
         try!(match self.stone_at(GoGame::vertex(row as u16, col as u16)) {
-          Some(Stone::Black) => write!(f, "\x1b[30m\u{25CF}\x1b[37m "),
-          Some(Stone::White) => write!(f, "\u{25CF} "),
+          Stone::Black => write!(f, "\x1b[30m\u{25CF}\x1b[37m "),
+          Stone::White => write!(f, "\u{25CF} "),
           _ => write!(f, "\u{00b7} ")
         });
       }
