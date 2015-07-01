@@ -59,6 +59,7 @@ pub struct GoGame {
   strings: collections::HashMap<u64, String>,
   string_index: Vec<Vec<u64>>,
   next_string_key: u64,
+  last_single_capture: Option<Vertex>,
   timer: bench::Timer,
 }
 
@@ -84,6 +85,7 @@ impl GoGame {
       strings: collections::HashMap::new(),
       string_index: vec![vec![0; size]; size],
       next_string_key: 1,
+      last_single_capture: None,
       timer: bench::Timer::new(),
     }
   }
@@ -104,6 +106,8 @@ impl GoGame {
     if !force && !self.can_play(stone, vertex) {
       return false;
     }
+
+    self.last_single_capture = None;
 
     let mut liberties = Vec::new();
     for n in self.neighbours(vertex) {
@@ -133,13 +137,22 @@ impl GoGame {
         };
       });
     }
+
+    let mut single_captures = vec![];
     for n in self.neighbours(vertex) {
       self.stone_at(n).map(|s| {
         if s == stone.opponent() && self.dead(n) {
+          if self.string(n).stones.len() == 1 {
+            single_captures.push(n);
+          }
           self.remove_group(n);
         }
       });
     }
+    if single_captures.len() == 1 {
+      self.last_single_capture = Some(single_captures[0]);
+    }
+
     for n in self.neighbours(vertex) {
       self.stone_at(n).map(|s| {
          if s == stone {
@@ -294,12 +307,10 @@ impl GoGame {
     }
 
     // Detect ko.
-    let mut playout = self.clone();
-    playout.play(stone, vertex, true);
-    if self.past_position_hashes.contains(&playout.position_hash()) {
-      // This board position already happened previously - ko!
-      self.timer.end();
-      return false
+    if let Some(v) = self.last_single_capture {
+      if v == vertex {
+        return false;
+      }
     }
 
     // Allow to play if the placed stone will kill at least one group.

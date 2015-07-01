@@ -7,7 +7,7 @@ mod go;
 mod bench;
 
 fn main() {
-  let num_playouts = 1000;
+  let num_playouts = 100000;
   let start = time::PreciseTime::now();
   let mut rng = rand::StdRng::from_seed(&[42]);
   for _ in 0 .. num_playouts {
@@ -25,10 +25,18 @@ fn play(rng: &mut rand::StdRng) {
   let mut num_consecutive_passes = 0;
   let mut num_moves = 0;
 
-  while num_consecutive_passes < 2 {
+  'outer: while num_consecutive_passes < 2 {
     num_moves += 1;
-    rng.shuffle(&mut empty_vertices);
     num_consecutive_passes += 1;
+    'inner: for i in 0 .. 10 {
+      let v = rng.choose(&empty_vertices).unwrap();
+      if game.can_play(color_to_play, *v) {
+        num_consecutive_passes = 0;
+        game.play(color_to_play, *v, false);
+        break 'outer;
+      }
+    }
+    rng.shuffle(&mut empty_vertices);
     for v in empty_vertices.iter() {
       if game.can_play(color_to_play, *v) {
         num_consecutive_passes = 0;
