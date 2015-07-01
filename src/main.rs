@@ -7,21 +7,23 @@ mod go;
 mod bench;
 
 fn main() {
-  let num_playouts = 1000;
+  let num_playouts = 1;
   let start = time::PreciseTime::now();
   let mut rng = rand::StdRng::from_seed(&[42]);
+  let mut num_moves = 0u64;
   for _ in 0 .. num_playouts {
-    play(&mut rng);
+    num_moves += play(&mut rng) as u64;
   }
   let total = start.to(time::PreciseTime::now());
   println!("{} playouts in {}, {} per playout", num_playouts, total,
       total / num_playouts);
+  println!("{} moves per playout", num_moves as f64 / num_playouts as f64);
 }
 
-fn play(rng: &mut rand::StdRng) {
+fn play(rng: &mut rand::StdRng) -> u32 {
   let mut game = go::GoGame::new(19);
   let mut color_to_play = go::Stone::White;
-  let mut empty_vertices = game.empty_vertices();
+  let mut empty_vertices;
   let mut num_consecutive_passes = 0;
   let mut num_moves = 0;
 
@@ -30,7 +32,7 @@ fn play(rng: &mut rand::StdRng) {
     empty_vertices = game.empty_vertices();
     num_moves += 1;
     num_consecutive_passes += 1;
-    'inner: for i in 0 .. 10 {
+    'inner: for _ in 0 .. 10 {
       let v = rng.choose(&empty_vertices).unwrap();
       if game.can_play(color_to_play, *v) {
         num_consecutive_passes = 0;
@@ -49,6 +51,7 @@ fn play(rng: &mut rand::StdRng) {
     // std::thread::sleep_ms(100);
   }
   // println!("{} moves", num_moves);
-  // game.report();
+  game.report();
   // println!("{}", game);
+  return num_moves;
 }

@@ -107,6 +107,8 @@ impl GoGame {
       return false;
     }
 
+    self.timer.section("insert string");
+
     self.last_single_capture = None;
 
     let mut liberties = Vec::new();
@@ -126,32 +128,7 @@ impl GoGame {
       liberties: liberties,
     });
 
-    self.board[vertex.y][vertex.x] = Some(stone);
-    // Remove the vertex now occupied by this stone from the neighbor's liberties.
-    for n in self.neighbours(vertex) {
-      self.stone_at(n).map(|_| {
-        let liberties = &mut self.strings.entry(self.string_index[n.y][n.x]).or_insert_with(|| panic!()).liberties;
-        match liberties.binary_search(&vertex) {
-          Ok(i) => { liberties.remove(i); () },
-          Err(_) => (),
-        };
-      });
-    }
-
-    let mut single_captures = vec![];
-    for n in self.neighbours(vertex) {
-      self.stone_at(n).map(|s| {
-        if s == stone.opponent() && self.dead(n) {
-          if self.string(n).stones.len() == 1 {
-            single_captures.push(n);
-          }
-          self.remove_group(n);
-        }
-      });
-    }
-    if single_captures.len() == 1 {
-      self.last_single_capture = Some(single_captures[0]);
-    }
+    self.timer.section("join groups");
 
     for n in self.neighbours(vertex) {
       self.stone_at(n).map(|s| {
@@ -164,6 +141,41 @@ impl GoGame {
         }
       });
     }
+
+    self.timer.section("remove liberties");
+
+    self.board[vertex.y][vertex.x] = Some(stone);
+    // Remove the vertex now occupied by this stone from the neighbor's liberties.
+    for n in self.neighbours(vertex) {
+      self.stone_at(n).map(|_| {
+        let liberties = &mut self.strings.entry(self.string_index[n.y][n.x]).or_insert_with(|| panic!()).liberties;
+        match liberties.binary_search(&vertex) {
+          Ok(i) => { liberties.remove(i); () },
+          Err(_) => (),
+        };
+      });
+    }
+
+    self.timer.section("capture groups");
+
+    let mut single_capture = None;
+    let mut num_captures = 0;
+    for n in self.neighbours(vertex) {
+      self.stone_at(n).map(|s| {
+        if s == stone.opponent() && self.dead(n) {
+          if self.string(n).stones.len() == 1 {
+            single_capture = Some(n);
+          }
+          num_captures += 1;
+          self.remove_group(n);
+        }
+      });
+    }
+    if num_captures == 1 {
+      self.last_single_capture = single_capture;
+    }
+
+    self.timer.section("check ko");
 
     let hash = self.position_hash();
     if !force && self.past_position_hashes.contains(&hash) {
@@ -184,6 +196,7 @@ impl GoGame {
     let smaller_string_index = self.string_index[smaller.y][smaller.x];
 
     if string_index == smaller_string_index {
+      self.timer.end();
       return;
     }
 
@@ -222,7 +235,7 @@ impl GoGame {
       for n in self.neighbours(v) {
         self.stone_at(n).map(|_| {
           let neighbour_string_i = self.string_index[n.y][n.x];
-          if (neighbour_string_i != string_index) {
+          if neighbour_string_i != string_index {
             let liberties = &mut self.strings.entry(neighbour_string_i).or_insert_with(|| panic!("remove_group")).liberties;
             match liberties.binary_search(&v) {
               Ok(_) => (),
@@ -328,7 +341,8 @@ impl GoGame {
     return false;
   }
 
-  pub fn empty_vertices(&self) -> Vec<Vertex>  {
+  pub fn empty_vertices(&mut self) -> Vec<Vertex>  {
+    self.timer.start("empty_vertices");
     let mut moves = Vec::new();
     for row in 0 .. self.size {
       for col in 0 .. self.size {
@@ -338,6 +352,7 @@ impl GoGame {
         }
       }
     }
+    self.timer.end();
     return moves;
   }
 

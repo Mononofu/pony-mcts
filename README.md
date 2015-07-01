@@ -4,6 +4,7 @@ v 0.1: full implementation of the Go rules, including ko detection. Supports com
 
 # MCTS for Go in Rust
 
+- 2015-07-01: playout time 2.1ms, missing 3 kos in 1000 rollouts 
 - 2015-06-29: playout time down to 10 ms, but missing 4 kos in 1000 rollouts
 - 2015-06-29: playout time down to 20 ms
 - 2015-06-28: playout time down to 150 ms
