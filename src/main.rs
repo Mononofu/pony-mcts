@@ -7,7 +7,7 @@ mod go;
 mod bench;
 
 fn main() {
-  let num_playouts = 100000;
+  let num_playouts = 1000;
   let start = time::PreciseTime::now();
   let mut rng = rand::StdRng::from_seed(&[42]);
   for _ in 0 .. num_playouts {
@@ -20,12 +20,14 @@ fn main() {
 
 fn play(rng: &mut rand::StdRng) {
   let mut game = go::GoGame::new(19);
-  let mut color_to_play = go::Stone::Black;
+  let mut color_to_play = go::Stone::White;
   let mut empty_vertices = game.empty_vertices();
   let mut num_consecutive_passes = 0;
   let mut num_moves = 0;
 
   'outer: while num_consecutive_passes < 2 {
+    color_to_play = color_to_play.opponent();
+    empty_vertices = game.empty_vertices();
     num_moves += 1;
     num_consecutive_passes += 1;
     'inner: for i in 0 .. 10 {
@@ -33,7 +35,7 @@ fn play(rng: &mut rand::StdRng) {
       if game.can_play(color_to_play, *v) {
         num_consecutive_passes = 0;
         game.play(color_to_play, *v, false);
-        break 'outer;
+        continue 'outer;
       }
     }
     rng.shuffle(&mut empty_vertices);
@@ -44,8 +46,6 @@ fn play(rng: &mut rand::StdRng) {
         break;
       }
     }
-    color_to_play = color_to_play.opponent();
-    empty_vertices = game.empty_vertices()
     // std::thread::sleep_ms(100);
   }
   // println!("{} moves", num_moves);
