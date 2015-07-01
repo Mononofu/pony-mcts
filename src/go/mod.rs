@@ -61,7 +61,7 @@ pub struct GoGame {
   string_index: Vec<Vec<u64>>,
   next_string_key: u64,
   last_single_capture: Option<Vertex>,
-  timer: bench::Timer,
+  pub timer: bench::Timer,
 }
 
 impl GoGame {
@@ -84,9 +84,9 @@ impl GoGame {
       size: size,
       board: vec![vec![None; size]; size],
       vertex_hashes: vertex_hashes,
-      past_position_hashes: collections::HashSet::new(),
+      past_position_hashes: collections::HashSet::with_capacity(500),
       position_hash: hash,
-      strings: collections::HashMap::new(),
+      strings: collections::HashMap::with_capacity(100),
       string_index: vec![vec![0; size]; size],
       next_string_key: 1,
       last_single_capture: None,
@@ -117,10 +117,6 @@ impl GoGame {
     // Place new stone and apply hash for it.
     self.board[vertex.y][vertex.x] = stone;
     self.position_hash = self.position_hash ^ self.hash_for(vertex);
-  }
-
-  pub fn report(&self) {
-    self.timer.report();
   }
 
   pub fn play(&mut self, stone: Stone, vertex: Vertex, force: bool) -> bool {

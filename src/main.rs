@@ -7,20 +7,24 @@ mod go;
 mod bench;
 
 fn main() {
-  let num_playouts = 10000;
+  let num_playouts = 1000;
   let start = time::PreciseTime::now();
   let mut rng = rand::StdRng::from_seed(&[42]);
   let mut num_moves = 0u64;
+  let mut timer = bench::Timer::new();
   for _ in 0 .. num_playouts {
-    num_moves += play(&mut rng) as u64;
+    let (n, t) = play(&mut rng);
+    num_moves += n as u64;
+    timer.combine(&t);
   }
   let total = start.to(time::PreciseTime::now());
   println!("{} playouts in {}, {} per playout", num_playouts, total,
       total / num_playouts);
   println!("{} moves per playout", num_moves as f64 / num_playouts as f64);
+  timer.report();
 }
 
-fn play(rng: &mut rand::StdRng) -> u32 {
+fn play(rng: &mut rand::StdRng) -> (u32, bench::Timer) {
   let mut game = go::GoGame::new(19);
   let mut color_to_play = go::Stone::White;
   let mut empty_vertices;
@@ -48,10 +52,6 @@ fn play(rng: &mut rand::StdRng) -> u32 {
         break;
       }
     }
-    // std::thread::sleep_ms(100);
   }
-  // println!("{} moves", num_moves);
-  // game.report();
-  // println!("{}", game);
-  return num_moves;
+  return (num_moves, game.timer);
 }
