@@ -4,27 +4,23 @@ use rand::SeedableRng;
 extern crate time;
 
 mod go;
-mod bench;
 
 fn main() {
-  let num_playouts = 1000;
+  let num_playouts = 10000;
   let start = time::PreciseTime::now();
   let mut rng = rand::StdRng::from_seed(&[42]);
   let mut num_moves = 0u64;
-  let mut timer = bench::Timer::new();
   for _ in 0 .. num_playouts {
-    let (n, t) = play(&mut rng);
+    let n = play(&mut rng);
     num_moves += n as u64;
-    timer.combine(&t);
   }
   let total = start.to(time::PreciseTime::now());
   println!("{} playouts in {}, {} per playout", num_playouts, total,
       total / num_playouts);
   println!("{} moves per playout", num_moves as f64 / num_playouts as f64);
-  timer.report();
 }
 
-fn play(rng: &mut rand::StdRng) -> (u32, bench::Timer) {
+fn play(rng: &mut rand::StdRng) -> u32 {
   let mut game = go::GoGame::new(19);
   let mut color_to_play = go::Stone::White;
   let mut empty_vertices;
@@ -53,5 +49,5 @@ fn play(rng: &mut rand::StdRng) -> (u32, bench::Timer) {
       }
     }
   }
-  return (num_moves, game.timer);
+  return num_moves;
 }

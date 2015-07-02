@@ -4,8 +4,6 @@ use rand::Rng;
 use std::fmt;
 use std::collections;
 
-use bench;
-
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
 pub enum Stone {
   Empty,
@@ -60,7 +58,6 @@ struct String {
   liberties: Vec<Vertex>,
 }
 
-#[derive(Clone)]
 pub struct GoGame {
   size: usize,
   board: Vec<Stone>,
@@ -71,13 +68,11 @@ pub struct GoGame {
   string_index: Vec<u64>,
   next_string_key: u64,
   last_single_capture: Option<Vertex>,
-  pub timer: bench::Timer,
 }
 
 impl GoGame {
   pub fn new(size: usize) -> GoGame {
     let mut rng = rand::thread_rng();
-
 
     let mut board = vec![Stone::Border; 21 * 21];
     let mut hash = 0;
@@ -104,7 +99,6 @@ impl GoGame {
       string_index: vec![0; 21 * 21],
       next_string_key: 1,
       last_single_capture: None,
-      timer: bench::Timer::new(),
     }
   }
 
@@ -133,12 +127,9 @@ impl GoGame {
   }
 
   pub fn play(&mut self, stone: Stone, vertex: Vertex, force: bool) -> bool {
-    self.timer.start("play");
     if !force && !self.can_play(stone, vertex) {
       return false;
     }
-
-    self.timer.section("insert string");
 
     self.last_single_capture = None;
 
@@ -160,11 +151,7 @@ impl GoGame {
       liberties: liberties,
     });
 
-    self.timer.section("join groups");
-
     self.check_neighbours_for_joining(vertex, stone);
-
-    self.timer.section("remove liberties");
 
     self.set_stone(stone, vertex);
     // Remove the vertex now occupied by this stone from the neighbor's liberties.
@@ -181,8 +168,6 @@ impl GoGame {
       }
     }
 
-    self.timer.section("capture groups");
-
     let mut single_capture = None;
     let mut num_captures = 0;
     for n in self.neighbours(vertex) {
@@ -198,18 +183,14 @@ impl GoGame {
       self.last_single_capture = single_capture;
     }
 
-    self.timer.section("check ko");
-
     if !force && self.past_position_hashes.contains(&self.position_hash) {
       println!("missed ko!");
     }
     self.past_position_hashes.insert(self.position_hash);
-    self.timer.end();
     return true;
   }
 
   fn check_neighbours_for_joining(&mut self, vertex: Vertex, stone: Stone) {
-    self.timer.start("check_neighbours_for_joining");
     for n in self.neighbours(vertex) {
       if self.stone_at(n) == stone {
         if self.string(n).stones.len() > self.string(vertex).stones.len() {
@@ -219,7 +200,6 @@ impl GoGame {
         }
       }
     }
-    self.timer.end();
   }
 
   fn string(&self, vertex: Vertex) -> &String {
@@ -228,14 +208,12 @@ impl GoGame {
   }
 
   fn join_groups(&mut self, smaller: Vertex, larger: Vertex) {
-    self.timer.start("join_groups");
     let Vertex(l) = larger;
     let string_index = self.string_index[l as usize];
     let Vertex(s) = smaller;
     let smaller_string_index = self.string_index[s as usize];
 
     if string_index == smaller_string_index {
-      self.timer.end();
       return;
     }
 
@@ -252,7 +230,6 @@ impl GoGame {
     }
 
     self.strings.remove(&smaller_string_index);
-    self.timer.end();
   }
 
   fn liberties(&self, vertex: Vertex) -> &Vec<Vertex> {
@@ -266,7 +243,6 @@ impl GoGame {
   }
 
   fn remove_group(&mut self, vertex: Vertex) {
-    self.timer.start("remove_group");
     let Vertex(v) = vertex;
     let string_index = self.string_index[v as usize];
     for Vertex(v) in self.group(vertex) {
@@ -288,7 +264,6 @@ impl GoGame {
       }
     }
     self.strings.remove(&string_index);
-    self.timer.end();
   }
 
   fn group(&self, vertex: Vertex) -> Vec<Vertex> {
@@ -306,10 +281,8 @@ impl GoGame {
   }
 
   pub fn can_play(&mut self, stone: Stone, vertex: Vertex) -> bool {
-    self.timer.start("can_play");
     // Can't play if the vertex is not empty.
     if self.stone_at(vertex) != Stone::Empty {
-      self.timer.end();
       return false;
     }
 
@@ -317,7 +290,6 @@ impl GoGame {
     // freedom (can't be ko).
     for n in self.neighbours(vertex) {
       if self.stone_at(n) == Stone::Empty {
-        self.timer.end();
         return true;
       }
     }
@@ -337,7 +309,6 @@ impl GoGame {
         }
       }
       if real_eye {
-        self.timer.end();
         return false;
       }
     }
@@ -346,7 +317,6 @@ impl GoGame {
     // least one other liberty after connecting.
     for n in self.neighbours(vertex) {
       if self.stone_at(n) == stone && self.string(n).liberties.len() > 1 {
-        self.timer.end();
         return true;
       }
     }
@@ -362,19 +332,15 @@ impl GoGame {
     for n in self.neighbours(vertex) {
       if self.stone_at(n) == stone.opponent() && self.string(n).liberties.len() == 1 &&
           self.string(n).liberties.first() == Some(&vertex) {
-        self.timer.end();
         return true;
       }
     }
-
-    self.timer.end();
 
     // Don't allow to play if the stone would be dead or kill its own group.
     return false;
   }
 
   pub fn empty_vertices(&mut self) -> Vec<Vertex>  {
-    self.timer.start("empty_vertices");
     let mut moves = Vec::new();
     for row in 0 .. self.size {
       for col in 0 .. self.size {
@@ -385,7 +351,6 @@ impl GoGame {
         }
       }
     }
-    self.timer.end();
     return moves;
   }
 
