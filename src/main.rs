@@ -6,7 +6,7 @@ extern crate time;
 mod go;
 
 fn main() {
-  let num_playouts = 10000;
+  let num_playouts = 5000;
   let start = time::PreciseTime::now();
   let mut rng = rand::StdRng::from_seed(&[42]);
   let mut num_moves = 0u64;
@@ -34,17 +34,15 @@ fn play(rng: &mut rand::StdRng) -> u32 {
     num_consecutive_passes += 1;
     'inner: for _ in 0 .. 10 {
       let v = rng.choose(&empty_vertices).unwrap();
-      if game.can_play(color_to_play, *v) {
+      if game.play(color_to_play, *v) {
         num_consecutive_passes = 0;
-        game.play(color_to_play, *v, false);
         continue 'outer;
       }
     }
     rng.shuffle(&mut empty_vertices);
     for v in empty_vertices.iter() {
-      if game.can_play(color_to_play, *v) {
+      if game.play(color_to_play, *v) {
         num_consecutive_passes = 0;
-        game.play(color_to_play, *v, false);
         break;
       }
     }

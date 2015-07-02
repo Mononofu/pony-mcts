@@ -95,7 +95,7 @@ impl GoGame {
       vertex_hashes: vertex_hashes,
       past_position_hashes: collections::HashSet::with_capacity(500),
       position_hash: hash,
-      strings: collections::HashMap::with_capacity(100),
+      strings: collections::HashMap::with_capacity(500),
       string_index: vec![0; 21 * 21],
       next_string_key: 1,
       last_single_capture: None,
@@ -126,13 +126,21 @@ impl GoGame {
     self.position_hash = self.position_hash ^ self.hash_for(vertex);
   }
 
-  pub fn play(&mut self, stone: Stone, vertex: Vertex, force: bool) -> bool {
-    if !force && !self.can_play(stone, vertex) {
+  pub fn play(&mut self, stone: Stone, vertex: Vertex) -> bool {
+    if !self.can_play(stone, vertex) {
       return false;
     }
-
     self.last_single_capture = None;
+    self.place_new_stone_as_string(vertex, stone);
+    self.join_neighbouring_groups(vertex, stone);
+    self.set_stone(stone, vertex);
+    self.remove_liberty_from_neighbouring_groups(vertex);
+    self.capture_dead_groups(vertex, stone);
+    self.check_ko();
+    return true;
+  }
 
+  fn place_new_stone_as_string(&mut self, vertex: Vertex, stone: Stone) {
     let mut liberties = Vec::new();
     for n in self.neighbours(vertex) {
       if self.stone_at(n) == Stone::Empty {
@@ -150,11 +158,21 @@ impl GoGame {
       stones: vec![vertex],
       liberties: liberties,
     });
+  }
 
-    self.check_neighbours_for_joining(vertex, stone);
+  fn join_neighbouring_groups(&mut self, vertex: Vertex, stone: Stone) {
+    for n in self.neighbours(vertex) {
+      if self.stone_at(n) == stone {
+        if self.string(n).stones.len() > self.string(vertex).stones.len() {
+          self.join_groups(vertex, n);
+        } else {
+          self.join_groups(n, vertex);
+        }
+      }
+    }
+  }
 
-    self.set_stone(stone, vertex);
-    // Remove the vertex now occupied by this stone from the neighbor's liberties.
+  fn remove_liberty_from_neighbouring_groups(&mut self, vertex: Vertex) {
     for Vertex(n) in self.neighbours(vertex) {
       match self.stone_at(Vertex(n)) {
         Stone::Black | Stone::White => {
@@ -167,7 +185,9 @@ impl GoGame {
         _ => (),
       }
     }
+  }
 
+  fn capture_dead_groups(&mut self, vertex: Vertex, stone: Stone) {
     let mut single_capture = None;
     let mut num_captures = 0;
     for n in self.neighbours(vertex) {
@@ -182,24 +202,13 @@ impl GoGame {
     if num_captures == 1 {
       self.last_single_capture = single_capture;
     }
+  }
 
-    if !force && self.past_position_hashes.contains(&self.position_hash) {
+  fn check_ko(&mut self) {
+    if self.past_position_hashes.contains(&self.position_hash) {
       println!("missed ko!");
     }
     self.past_position_hashes.insert(self.position_hash);
-    return true;
-  }
-
-  fn check_neighbours_for_joining(&mut self, vertex: Vertex, stone: Stone) {
-    for n in self.neighbours(vertex) {
-      if self.stone_at(n) == stone {
-        if self.string(n).stones.len() > self.string(vertex).stones.len() {
-          self.join_groups(vertex, n);
-        } else {
-          self.join_groups(n, vertex);
-        }
-      }
-    }
   }
 
   fn string(&self, vertex: Vertex) -> &String {
@@ -286,6 +295,13 @@ impl GoGame {
       return false;
     }
 
+    // Detect ko.
+    if let Some(v) = self.last_single_capture {
+      if v == vertex {
+        return false;
+      }
+    }
+
     // Can definitely play if the placed stone will have at least one direct
     // freedom (can't be ko).
     for n in self.neighbours(vertex) {
@@ -318,13 +334,6 @@ impl GoGame {
     for n in self.neighbours(vertex) {
       if self.stone_at(n) == stone && self.string(n).liberties.len() > 1 {
         return true;
-      }
-    }
-
-    // Detect ko.
-    if let Some(v) = self.last_single_capture {
-      if v == vertex {
-        return false;
       }
     }
 
