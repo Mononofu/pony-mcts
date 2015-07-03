@@ -1,12 +1,30 @@
 extern crate rand;
 use rand::Rng;
 use rand::SeedableRng;
+use std::num;
 extern crate time;
 
 mod go;
 
 fn main() {
-  let num_playouts = 10000;
+  let num_trials = 11;
+  let num_rollouts = 10000;
+  let mut durations = (0..num_trials).map(|_| benchmark_run(num_rollouts)).collect::<Vec<_>>();
+  durations.sort();
+  let mean = durations.iter().fold(time::Duration::zero(), |acc, &d| acc + d) / num_trials;
+  let median = durations[(num_trials / 2) as usize];
+  let min = durations[0];
+  let max = durations[(num_trials - 1) as usize];
+  let mut stddev = 0.0;
+  for d in durations {
+    let diff = (d.num_nanoseconds().unwrap() - mean.num_nanoseconds().unwrap()) as f64;
+    stddev += diff * diff;
+  }
+  let stddev_dur = time::Duration::nanoseconds(stddev.sqrt() as i64);
+  println!("|{}---{}---{}|, mean {} +- {}", min, median, max, mean, stddev_dur);
+}
+
+fn benchmark_run(num_playouts: i32) -> time::Duration {
   let start = time::PreciseTime::now();
   let mut rng = rand::StdRng::from_seed(&[42]);
   let mut num_moves = 0u64;
@@ -18,6 +36,7 @@ fn main() {
   println!("{} playouts in {}, {} per playout", num_playouts, total,
       total / num_playouts);
   println!("{} moves per playout", num_moves as f64 / num_playouts as f64);
+  return total;
 }
 
 fn play(rng: &mut rand::StdRng) -> u32 {
