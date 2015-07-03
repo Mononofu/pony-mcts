@@ -65,11 +65,12 @@ pub struct GoGame {
   size: usize,
   board: Vec<Stone>,
   vertex_hashes: Vec<u64>,
-  past_position_hashes: collections::HashSet<u64>,
+  past_position_hashes: collections::HashMap<u64, u16>,
   position_hash: u64,
   strings: Vec<String>,
   string_index: Vec<usize>,
   last_single_capture: Option<Vertex>,
+  num_moves: u16,
 }
 
 impl GoGame {
@@ -103,11 +104,12 @@ impl GoGame {
       size: size,
       board: board,
       vertex_hashes: vertex_hashes,
-      past_position_hashes: collections::HashSet::with_capacity(500),
+      past_position_hashes: collections::HashMap::with_capacity(500),
       position_hash: hash,
       strings: strings,
       string_index: vec![0; 21 * 21],
       last_single_capture: None,
+      num_moves: 0,
     }
   }
 
@@ -140,11 +142,12 @@ impl GoGame {
       return false;
     }
     self.last_single_capture = None;
+    self.num_moves += 1;
     self.join_groups_around(vertex, stone);
     self.set_stone(stone, vertex);
     self.remove_liberty_from_neighbouring_groups(vertex);
     self.capture_dead_groups(vertex, stone);
-    self.check_ko();
+    // self.check_ko();
     return true;
   }
 
@@ -201,10 +204,11 @@ impl GoGame {
   }
 
   fn check_ko(&mut self) {
-    if self.past_position_hashes.contains(&self.position_hash) {
-      println!("missed ko!");
+    if self.past_position_hashes.contains_key(&self.position_hash) {
+      println!("missed ko, {} and {} identical!",
+        self.past_position_hashes[&self.position_hash], self.num_moves);
     }
-    self.past_position_hashes.insert(self.position_hash);
+    self.past_position_hashes.insert(self.position_hash, self.num_moves);
   }
 
   fn string(&self, vertex: Vertex) -> &String {
