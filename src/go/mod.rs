@@ -4,6 +4,9 @@ use rand::Rng;
 use std::fmt;
 use std::collections;
 
+const MAX_LIBERTIES_PER_STRING: usize = 10;
+const MIN_LIBERTIES_PER_STRING: usize = 5;
+
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
 pub enum Stone {
   Empty,
@@ -54,7 +57,7 @@ impl fmt::Debug for Vertex {
 #[derive(Clone)]
 struct String {
   color: Stone,
-  stones: Vec<Vertex>,
+  stones: collections::LinkedList<Vertex>,
   liberties: Vec<Vertex>,
 }
 
@@ -92,7 +95,7 @@ impl GoGame {
     // Add a null string.
     strings.push(String{
       color: Stone::Empty,
-      stones: vec![],
+      stones: collections::LinkedList::new(),
       liberties: vec![],
     });
 
@@ -158,9 +161,11 @@ impl GoGame {
 
     let Vertex(v) = vertex;
     self.string_index[v as usize] = self.strings.len();
+    let mut stones = collections::LinkedList::new();
+    stones.push_back(vertex);
     self.strings.push(String{
       color: stone,
-      stones: vec![vertex],
+      stones: stones,
       liberties: liberties,
     });
   }
@@ -245,6 +250,16 @@ impl GoGame {
         let Vertex(v) = n;
         let string_i = self.string_index[v as usize];
         if string_i != largest_group_i {
+          let mut stones = collections::LinkedList::new();
+          {
+            use std::mem::swap;
+            swap(&mut self.strings[string_i].stones, &mut stones);
+          }
+          for &Vertex(v) in stones.iter() {
+            self.string_index[v as usize] = largest_group_i;
+          }
+          self.strings[largest_group_i].stones.append(&mut stones);
+
           let mut liberties = vec![];
           {
             use std::mem::swap;
@@ -258,22 +273,11 @@ impl GoGame {
               Err(i) => libs.insert(i, l.clone()),
             };
           }
-
-          let mut stones = vec![];
-          {
-            use std::mem::swap;
-            swap(&mut self.strings[string_i].stones, &mut stones);
-          }
-
-          for &Vertex(v) in stones.iter() {
-            self.string_index[v as usize] = largest_group_i;
-            self.strings[largest_group_i].stones.push(Vertex(v.clone()));
-          }
         }
       }
     }
 
-    self.strings[largest_group_i].stones.push(vertex);
+    self.strings[largest_group_i].stones.push_back(vertex);
     for n in GoGame::neighbours(vertex) {
       if self.stone_at(n) == Stone::Empty {
         let mut libs = &mut self.strings[largest_group_i].liberties;
@@ -314,7 +318,7 @@ impl GoGame {
 
     for &Vertex(v) in smaller_string.stones.iter() {
       self.string_index[v as usize] = string_index;
-      larger_string.stones.push(Vertex(v.clone()));
+      larger_string.stones.push_back(Vertex(v.clone()));
     }
   }
 
@@ -331,7 +335,7 @@ impl GoGame {
   fn remove_group(&mut self, vertex: Vertex) {
     let Vertex(v) = vertex;
     let string_index = self.string_index[v as usize];
-    let mut stones = vec![];
+    let mut stones = collections::LinkedList::new();
     {
       use std::mem::swap;
       swap(&mut self.strings[string_index].stones, &mut stones);
