@@ -155,7 +155,6 @@ impl GoGame {
         liberties.push(n);
       }
     }
-    liberties.sort();
 
     let Vertex(v) = vertex;
     self.string_index[v as usize] = self.strings.len();
@@ -172,15 +171,40 @@ impl GoGame {
     for Vertex(n) in GoGame::neighbours(vertex) {
       match self.stone_at(Vertex(n)) {
         Stone::Black | Stone::White => {
-          let liberties = &mut self.strings[self.string_index[n as usize]].liberties;
-          match liberties.binary_search(&vertex) {
-            Ok(i) => { liberties.remove(i); () },
-            Err(_) => (),
-          };
+          {
+            let liberties = &mut self.strings[self.string_index[n as usize]].liberties;
+            for i in 0 .. liberties.len() {
+              if liberties[i] == vertex {
+                liberties.swap_remove(i);
+                break;
+              }
+            }
+          }
+          if self.strings[self.string_index[n as usize]].liberties.len() < MIN_LIBERTIES_PER_STRING {
+            self.update_liberties_for_string(Vertex(n));
+          }
         },
         _ => (),
       }
     }
+  }
+
+  fn update_liberties_for_string(&mut self, vertex: Vertex) {
+    let Vertex(v) = vertex;
+    let mut liberties = vec![];
+    'outer: for &stone in self.strings[self.string_index[v as usize]].stones.iter() {
+      for n in GoGame::neighbours(stone) {
+        if self.stone_at(n) == Stone::Empty {
+          liberties.push(n);
+          if liberties.len() > 2 * MAX_LIBERTIES_PER_STRING {
+            break 'outer;
+          }
+        }
+      }
+    }
+    liberties.sort();
+    liberties.dedup();
+    self.strings[self.string_index[v as usize]].liberties = liberties;
   }
 
   fn capture_dead_groups(&mut self, vertex: Vertex, stone: Stone) {
@@ -254,10 +278,11 @@ impl GoGame {
 
           for l in liberties.iter() {
             let mut libs = &mut self.strings[largest_group_i].liberties;
-            match libs.binary_search(&l) {
-              Ok(_) => (),
-              Err(i) => libs.insert(i, l.clone()),
-            };
+            if libs.len() > MAX_LIBERTIES_PER_STRING {
+              break;
+            } else {
+              libs.push(Vertex(v));
+            }
           }
         }
       }
@@ -313,10 +338,11 @@ impl GoGame {
           let neighbour_string_i = self.string_index[n as usize];
           if neighbour_string_i != string_index {
             let liberties = &mut self.strings[neighbour_string_i].liberties;
-            match liberties.binary_search(&Vertex(v)) {
-              Ok(_) => (),
-              Err(i) => liberties.insert(i, Vertex(v)),
-            };
+            if liberties.len() > MAX_LIBERTIES_PER_STRING {
+              continue;
+            } else {
+              liberties.push(Vertex(v));
+            }
           }
         }
       }
