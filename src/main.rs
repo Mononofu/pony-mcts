@@ -1,7 +1,6 @@
 extern crate rand;
 use rand::Rng;
 use rand::SeedableRng;
-use std::num;
 extern crate time;
 
 mod go;

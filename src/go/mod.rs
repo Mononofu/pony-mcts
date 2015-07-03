@@ -140,8 +140,6 @@ impl GoGame {
       return false;
     }
     self.last_single_capture = None;
-    // self.place_new_stone_as_string(vertex, stone);
-    // self.join_neighbouring_groups(vertex, stone);
     self.join_groups_around(vertex, stone);
     self.set_stone(stone, vertex);
     self.remove_liberty_from_neighbouring_groups(vertex);
@@ -168,18 +166,6 @@ impl GoGame {
       stones: stones,
       liberties: liberties,
     });
-  }
-
-  fn join_neighbouring_groups(&mut self, vertex: Vertex, stone: Stone) {
-    for n in GoGame::neighbours(vertex) {
-      if self.stone_at(n) == stone {
-        if self.string(n).stones.len() > self.string(vertex).stones.len() {
-          self.join_groups(vertex, n);
-        } else {
-          self.join_groups(n, vertex);
-        }
-      }
-    }
   }
 
   fn remove_liberty_from_neighbouring_groups(&mut self, vertex: Vertex) {
@@ -291,37 +277,6 @@ impl GoGame {
     self.string_index[v as usize] = largest_group_i;
   }
 
-  fn join_groups(&mut self, smaller: Vertex, larger: Vertex) {
-    let Vertex(l) = larger;
-    let string_index = self.string_index[l as usize];
-    let Vertex(s) = smaller;
-    let smaller_string_index = self.string_index[s as usize];
-
-    if string_index == smaller_string_index {
-      return;
-    }
-
-    let (ref smaller_string, ref mut larger_string) = if string_index > smaller_string_index {
-      let (left, mut right) = self.strings.split_at_mut(string_index);
-      (&left[smaller_string_index], &mut right[0])
-    } else {
-      let (mut left, right) = self.strings.split_at_mut(smaller_string_index);
-      (&right[0], &mut left[string_index])
-    };
-
-    for l in smaller_string.liberties.iter() {
-      match larger_string.liberties.binary_search(&l) {
-        Ok(_) => (),
-        Err(i) => larger_string.liberties.insert(i, l.clone()),
-      };
-    }
-
-    for &Vertex(v) in smaller_string.stones.iter() {
-      self.string_index[v as usize] = string_index;
-      larger_string.stones.push_back(Vertex(v.clone()));
-    }
-  }
-
   fn liberties(&self, vertex: Vertex) -> &Vec<Vertex> {
     return &self.string(vertex).liberties;
   }
@@ -335,19 +290,19 @@ impl GoGame {
   fn remove_group(&mut self, vertex: Vertex) {
     let Vertex(v) = vertex;
     let string_index = self.string_index[v as usize];
-    let mut stones = collections::LinkedList::new();
-    {
-      use std::mem::swap;
-      swap(&mut self.strings[string_index].stones, &mut stones);
-    }
-    // self.strings.push(String{
-    //   color: Stone::Empty,
-    //   stones: vec![],
-    //   liberties: vec![],
-    // });
-    // let string = self.strings.swap_remove(string_index);
+    // let mut stones = collections::LinkedList::new();
+    // {
+    //   use std::mem::swap;
+    //   swap(&mut self.strings[string_index].stones, &mut stones);
+    // }
+    self.strings.push(String{
+      color: Stone::Empty,
+      stones: collections::LinkedList::new(),
+      liberties: vec![],
+    });
+    let string = self.strings.swap_remove(string_index);
 
-    for &Vertex(v) in stones.iter() {
+    for &Vertex(v) in string.stones.iter() {
       self.set_stone(Stone::Empty, Vertex(v));
       self.string_index[v as usize] = 0;
 
