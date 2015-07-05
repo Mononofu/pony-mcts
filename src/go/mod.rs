@@ -64,6 +64,7 @@ struct String {
 pub struct GoGame {
   size: usize,
   board: Vec<Stone>,
+  legal_moves: Vec<Vertex>,
   vertex_hashes: Vec<u64>,
   past_position_hashes: collections::HashSet<u64>,
   position_hash: u64,
@@ -77,6 +78,7 @@ impl GoGame {
     let mut rng = rand::thread_rng();
 
     let mut board = vec![Stone::Border; 21 * 21];
+    let mut legal_moves = vec![];
     let mut hash = 0;
     let mut vertex_hashes = vec![0; 3 * board.len()];
     for col in 0 .. size {
@@ -88,6 +90,7 @@ impl GoGame {
         hash = hash ^ vertex_hashes[0 * size * size + col + row * size];
         let Vertex(v) = GoGame::vertex(row as u16, col as u16);
         board[v as usize] = Stone::Empty;
+        legal_moves.push(Vertex(v));
       }
     }
 
@@ -102,6 +105,7 @@ impl GoGame {
     GoGame {
       size: size,
       board: board,
+      legal_moves: legal_moves,
       vertex_hashes: vertex_hashes,
       past_position_hashes: collections::HashSet::with_capacity(500),
       position_hash: hash,
@@ -142,6 +146,7 @@ impl GoGame {
     self.last_single_capture = None;
     self.join_groups_around(vertex, stone);
     self.set_stone(stone, vertex);
+    self.remove_vertex_from_legal_moves(stone, vertex);
     self.remove_liberty_from_neighbouring_groups(vertex);
     self.capture_dead_groups(vertex, stone);
     self.check_ko();
@@ -166,6 +171,16 @@ impl GoGame {
       stones: stones,
       liberties: liberties,
     });
+  }
+
+  fn remove_vertex_from_legal_moves(&mut self, stone: Stone, vertex: Vertex) -> bool {
+    for i in 0 .. self.legal_moves.len() {
+      if self.legal_moves[i] == vertex {
+        self.legal_moves.swap_remove(i);
+        return true;
+      }
+    }
+    return false;
   }
 
   fn remove_liberty_from_neighbouring_groups(&mut self, vertex: Vertex) {
