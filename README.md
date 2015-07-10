@@ -6,6 +6,10 @@ v 0.1: full implementation of the Go rules, including ko detection. Supports com
 
 For comparison, [libego](https://github.com/lukaszlew/libego) does about 7.6 k playouts / second, or 0.13 ms per playout.
 
+
+- 2015-07-11: another speedup from storing string membership as integer based linked lists, only a bit more than 2x slower than libego:
+  |PT2.849937705S---PT2.850953776S---PT2.862720022S|, mean PT2.853414755S +- PT0.012636017S
+  That's 3.5k rollouts per second!
 - 2015-07-10: better random move selection cuts time in half:
   |PT3.781544956S---PT3.786354668S---PT3.797252693S|, mean PT3.787625374S +- PT0.014460112S
   (duration of 10k playouts)
