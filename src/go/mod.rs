@@ -32,7 +32,7 @@ pub struct Vertex(pub u16);
 impl Vertex {
   fn to_coords(self) -> (u16, u16) {
     let Vertex(v) = self;
-    return (v % 21 - 1, v / 21 - 1);
+    return ((v % 21) - 1, v / 21 - 1);
   }
 }
 
@@ -64,7 +64,6 @@ struct String {
 pub struct GoGame {
   size: usize,
   board: Vec<Stone>,
-  legal_moves: Vec<Vertex>,
   vertex_hashes: Vec<u64>,
   past_position_hashes: collections::HashSet<u64>,
   position_hash: u64,
@@ -78,7 +77,6 @@ impl GoGame {
     let mut rng = rand::thread_rng();
 
     let mut board = vec![Stone::Border; 21 * 21];
-    let mut legal_moves = vec![];
     let mut hash = 0;
     let mut vertex_hashes = vec![0; 3 * board.len()];
     for col in 0 .. size {
@@ -90,7 +88,6 @@ impl GoGame {
         hash = hash ^ vertex_hashes[0 * size * size + col + row * size];
         let Vertex(v) = GoGame::vertex(row as u16, col as u16);
         board[v as usize] = Stone::Empty;
-        legal_moves.push(Vertex(v));
       }
     }
 
@@ -105,7 +102,6 @@ impl GoGame {
     GoGame {
       size: size,
       board: board,
-      legal_moves: legal_moves,
       vertex_hashes: vertex_hashes,
       past_position_hashes: collections::HashSet::with_capacity(500),
       position_hash: hash,
@@ -146,7 +142,6 @@ impl GoGame {
     self.last_single_capture = None;
     self.join_groups_around(vertex, stone);
     self.set_stone(stone, vertex);
-    self.remove_vertex_from_legal_moves(stone, vertex);
     self.remove_liberty_from_neighbouring_groups(vertex);
     self.capture_dead_groups(vertex, stone);
     self.check_ko();
@@ -173,27 +168,15 @@ impl GoGame {
     });
   }
 
-  fn remove_vertex_from_legal_moves(&mut self, stone: Stone, vertex: Vertex) -> bool {
-    for i in 0 .. self.legal_moves.len() {
-      if self.legal_moves[i] == vertex {
-        self.legal_moves.swap_remove(i);
-        return true;
-      }
-    }
-    return false;
-  }
-
   fn remove_liberty_from_neighbouring_groups(&mut self, vertex: Vertex) {
     for Vertex(n) in GoGame::neighbours(vertex) {
-      match self.stone_at(Vertex(n)) {
-        Stone::Black | Stone::White => {
-          let liberties = &mut self.strings[self.string_index[n as usize]].liberties;
-          match liberties.binary_search(&vertex) {
-            Ok(i) => { liberties.remove(i); () },
-            Err(_) => (),
-          };
-        },
-        _ => (),
+      let string_index = self.string_index[n as usize];
+      if string_index != 0 {
+        let liberties = &mut self.strings[string_index].liberties;
+        match liberties.binary_search(&vertex) {
+          Ok(i) => { liberties.remove(i); () },
+          Err(_) => (),
+        };
       }
     }
   }
@@ -348,7 +331,7 @@ impl GoGame {
     return vec![Vertex(v - 1), Vertex(v + 1), Vertex(v - 21), Vertex(v + 21)];
   }
 
-  pub fn can_play(&mut self, stone: Stone, vertex: Vertex) -> bool {
+  pub fn can_play(&self, stone: Stone, vertex: Vertex) -> bool {
     // Can't play if the vertex is not empty.
     if self.stone_at(vertex) != Stone::Empty {
       return false;
@@ -422,6 +405,27 @@ impl GoGame {
     return moves;
   }
 
+  pub fn random_move(&self, stone: Stone, rng: &mut rand::StdRng) -> Option<Vertex> {
+    let num_vertices = self.board.len() as u16;
+    let start_vertex = rng.gen_range(0, num_vertices);
+    let mut v = start_vertex;
+
+    while true {
+      if self.can_play(stone, Vertex(v)) {
+        return Some(Vertex(v));
+      }
+      v += 1;
+      if (v == num_vertices) {
+        v = 0;
+      }
+      if (v == start_vertex) {
+        return None;
+      }
+    }
+
+    return None;
+  }
+
   pub fn possible_moves(&mut self, stone: Stone) -> Vec<Vertex> {
     let mut moves = Vec::new();
     for row in 0 .. self.size {
@@ -448,7 +452,7 @@ impl fmt::Display for GoGame {
     for row in 0 .. self.size {
       try!(write!(f, " {:2} \x1b[43m\x1b[1;37m ", row + 1));
       for col in 0 .. self.size {
-        try!(match self.stone_at(GoGame::vertex(row as u16, col as u16)) {
+        try!(match self.stone_at(GoGame::vertex(col as u16, row as u16)) {
           Stone::Black => write!(f, "\x1b[30m\u{25CF}\x1b[37m "),
           Stone::White => write!(f, "\u{25CF} "),
           _ => write!(f, "\u{00b7} ")

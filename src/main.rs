@@ -46,22 +46,15 @@ fn play(rng: &mut rand::StdRng) -> u32 {
 
   'outer: while num_consecutive_passes < 2 {
     color_to_play = color_to_play.opponent();
-    let mut empty_vertices = game.empty_vertices();
     num_moves += 1;
-    num_consecutive_passes += 1;
-    'inner: for _ in 0 .. 10 {
-      let v = rng.choose(&empty_vertices).unwrap();
-      if game.play(color_to_play, *v) {
+    match game.random_move(color_to_play, rng) {
+      Some(v) => {
+        game.play(color_to_play, v);
         num_consecutive_passes = 0;
-        continue 'outer;
-      }
-    }
-    rng.shuffle(&mut empty_vertices);
-    for v in empty_vertices.iter() {
-      if game.play(color_to_play, *v) {
-        num_consecutive_passes = 0;
-        break;
-      }
+      },
+      None => {
+        num_consecutive_passes += 1;
+      },
     }
   }
   return num_moves;
