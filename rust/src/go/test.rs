@@ -111,34 +111,3 @@ fn forbid_filling_real_eyes_of_split_group() {
   assert_eq!(false, game.can_play(Stone::Black, GoGame::vertex(1, 0)));
 }
 
-#[test]
-fn possible_move_caching() {
-  let mut game = GoGame::new(9);
-  let mut rng = rand::StdRng::from_seed(&[42]);
-  let mut color_to_play = Stone::White;
-  let mut num_consecutive_passes = 0;
-  let mut num_moves = 0;
-
-  while num_consecutive_passes < 2 {
-    color_to_play = color_to_play.opponent();
-    num_moves += 1;
-
-    let mut possible = game.possible_moves(color_to_play).clone();
-    possible.sort();
-    let mut cached = game.legal_moves.clone();
-    cached.sort();
-    println!("{:?}", num_moves);
-    println!("{}", game);
-    assert_eq!(possible, cached);
-
-    if let Some(v) = rng.choose(&possible) {
-      println!("{}", v);
-      num_consecutive_passes = 0;
-      assert!(game.play(color_to_play, *v));
-    } else {
-      num_consecutive_passes += 1;
-    }
-  }
-
-
-}

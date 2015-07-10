@@ -54,6 +54,11 @@ fn play(rng: &mut rand::StdRng) -> u32 {
       game.play(color_to_play, v);
       num_consecutive_passes = 0;
     }
+    if num_moves > 700 {
+      println!("suspicious game with > 700 moves");
+      println!("{}", game);
+      break;
+    }
   }
   return num_moves;
 }
