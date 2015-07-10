@@ -48,10 +48,7 @@ impl fmt::Display for Vertex {
 }
 impl fmt::Debug for Vertex {
   fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-    let (x, y) = self.to_coords();
-    let column_labels = "ABCDEFGHIKLMNOPORSTU";
-    try!(write!(f, "{}", column_labels.chars().nth(x as usize).unwrap()));
-    return write!(f, "{}", y + 1);
+    return write!(f, "{}", self);
   }
 }
 
