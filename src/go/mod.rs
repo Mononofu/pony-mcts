@@ -406,8 +406,8 @@ impl GoGame {
   }
 
   pub fn random_move(&self, stone: Stone, rng: &mut rand::StdRng) -> Option<Vertex> {
-    let num_vertices = self.board.len() as u16;
-    let start_vertex = rng.gen_range(0, num_vertices);
+    let num_vertices = 419;
+    let start_vertex = rng.gen_range(22, num_vertices);
     let mut v = start_vertex;
 
     while true {
