@@ -428,15 +428,13 @@ impl GoGame {
         return Some(Vertex(v));
       }
       v += 1;
-      if (v == num_vertices) {
+      if v == num_vertices {
         v = 0;
       }
-      if (v == start_vertex) {
+      if v == start_vertex {
         return None;
       }
     }
-
-    return None;
   }
 
   pub fn possible_moves(&mut self, stone: Stone) -> Vec<Vertex> {
