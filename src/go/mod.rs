@@ -410,7 +410,7 @@ impl GoGame {
     let start_vertex = rng.gen_range(22, num_vertices);
     let mut v = start_vertex;
 
-    while true {
+    loop {
       if self.can_play(stone, Vertex(v)) {
         return Some(Vertex(v));
       }

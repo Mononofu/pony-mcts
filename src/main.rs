@@ -32,8 +32,8 @@ fn benchmark_run(num_playouts: i32) -> time::Duration {
     num_moves += n as u64;
   }
   let total = start.to(time::PreciseTime::now());
-  println!("{} playouts in {}, {} per playout", num_playouts, total,
-      total / num_playouts);
+  println!("{} playouts in {}, {:.2} kpps", num_playouts, total,
+      num_playouts as f64 / total.num_milliseconds() as f64);
   println!("{} moves per playout", num_moves as f64 / num_playouts as f64);
   return total;
 }

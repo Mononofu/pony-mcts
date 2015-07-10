@@ -6,6 +6,10 @@ v 0.1: full implementation of the Go rules, including ko detection. Supports com
 
 For comparison, [libego](https://github.com/lukaszlew/libego) does about 7.6 k playouts / second, or 0.13 ms per playout.
 
+- 2015-07-10: better random move selection cuts time in half:
+  |PT3.781544956S---PT3.786354668S---PT3.797252693S|, mean PT3.787625374S +- PT0.014460112S
+  (duration of 10k playouts)
+  Only 3x slower than libego now.
 - 2015-07-03: now with better statistics, down to below 0.8 ms:
   |PT7.698399799S---PT7.709610406S---PT7.750532471S|, mean PT7.713656318S +- PT0.043821621S
   Or 6 times slower than libego.
