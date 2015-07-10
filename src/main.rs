@@ -47,14 +47,12 @@ fn play(rng: &mut rand::StdRng) -> u32 {
   'outer: while num_consecutive_passes < 2 {
     color_to_play = color_to_play.opponent();
     num_moves += 1;
-    match game.random_move(color_to_play, rng) {
-      Some(v) => {
-        game.play(color_to_play, v);
-        num_consecutive_passes = 0;
-      },
-      None => {
-        num_consecutive_passes += 1;
-      },
+    let v = game.random_move(color_to_play, rng);
+    if v == go::PASS {
+      num_consecutive_passes += 1;
+    } else {
+      game.play(color_to_play, v);
+      num_consecutive_passes = 0;
     }
   }
   return num_moves;

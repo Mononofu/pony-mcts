@@ -27,10 +27,12 @@ impl Stone {
 }
 
 #[derive(Eq, Hash, PartialEq, Copy, Clone, Ord, PartialOrd)]
-pub struct Vertex(pub u16);
+pub struct Vertex(pub i16);
+
+pub const PASS: Vertex = Vertex(-1);
 
 impl Vertex {
-  fn to_coords(self) -> (u16, u16) {
+  fn to_coords(self) -> (i16, i16) {
     let Vertex(v) = self;
     return ((v % 21) - 1, v / 21 - 1);
   }
@@ -88,7 +90,7 @@ impl GoGame {
           // Create initial board hash.
           hash = hash ^ vertex_hashes[0 * size * size + col + row * size];
         }
-        let Vertex(v) = GoGame::vertex(row as u16, col as u16);
+        let Vertex(v) = GoGame::vertex(row as i16, col as i16);
         board[v as usize] = Stone::Empty;
       }
     }
@@ -118,7 +120,7 @@ impl GoGame {
     }
   }
 
-  pub fn vertex(x: u16, y: u16) -> Vertex {
+  pub fn vertex(x: i16, y: i16) -> Vertex {
     Vertex(x + 1 + (y + 1) * 21)
   }
 
@@ -408,7 +410,7 @@ impl GoGame {
     let mut moves = Vec::with_capacity(self.size * self.size);
     for row in 0 .. self.size {
       for col in 0 .. self.size {
-        let vertex = GoGame::vertex(row as u16, col as u16);
+        let vertex = GoGame::vertex(row as i16, col as i16);
         let Vertex(v) = vertex;
         if self.board[v as usize] == Stone::Empty {
           moves.push(vertex);
@@ -418,21 +420,21 @@ impl GoGame {
     return moves;
   }
 
-  pub fn random_move(&self, stone: Stone, rng: &mut rand::StdRng) -> Option<Vertex> {
+  pub fn random_move(&self, stone: Stone, rng: &mut rand::StdRng) -> Vertex {
     let num_vertices = 419;
     let start_vertex = rng.gen_range(22, num_vertices);
     let mut v = start_vertex;
 
     loop {
       if self.can_play(stone, Vertex(v)) {
-        return Some(Vertex(v));
+        return Vertex(v);
       }
       v += 1;
       if v == num_vertices {
         v = 0;
       }
       if v == start_vertex {
-        return None;
+        return PASS;
       }
     }
   }
@@ -441,7 +443,7 @@ impl GoGame {
     let mut moves = Vec::new();
     for row in 0 .. self.size {
       for col in 0 .. self.size {
-        let v = GoGame::vertex(row as u16, col as u16);
+        let v = GoGame::vertex(row as i16, col as i16);
         if self.can_play(stone, v) {
           moves.push(v);
         }
@@ -463,7 +465,7 @@ impl fmt::Display for GoGame {
     for row in 0 .. self.size {
       try!(write!(f, " {:2} \x1b[43m\x1b[1;37m ", row + 1));
       for col in 0 .. self.size {
-        try!(match self.stone_at(GoGame::vertex(col as u16, row as u16)) {
+        try!(match self.stone_at(GoGame::vertex(col as i16, row as i16)) {
           Stone::Black => write!(f, "\x1b[30m\u{25CF}\x1b[37m "),
           Stone::White => write!(f, "\u{25CF} "),
           _ => write!(f, "\u{00b7} ")
