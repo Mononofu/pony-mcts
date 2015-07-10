@@ -4,9 +4,6 @@ use rand::Rng;
 use std::fmt;
 use std::collections;
 
-const MAX_LIBERTIES_PER_STRING: usize = 10;
-const MIN_LIBERTIES_PER_STRING: usize = 5;
-
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
 pub enum Stone {
   Empty,
