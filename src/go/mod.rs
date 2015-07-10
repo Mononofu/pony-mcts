@@ -78,14 +78,16 @@ impl GoGame {
 
     let mut board = vec![Stone::Border; 21 * 21];
     let mut hash = 0;
-    let mut vertex_hashes = vec![0; 3 * board.len()];
+    let mut vertex_hashes =  if cfg!(debug) { vec![0; 3 * board.len()] } else { vec![] };
     for col in 0 .. size {
       for row in 0 .. size {
-        vertex_hashes[0 * size * size + col + row * size] = rng.gen(); // Empty
-        vertex_hashes[1 * size * size + col + row * size] = rng.gen(); // Black
-        vertex_hashes[2 * size * size + col + row * size] = rng.gen(); // White
-        // Create initial board hash.
-        hash = hash ^ vertex_hashes[0 * size * size + col + row * size];
+        if cfg!(debug) {
+          vertex_hashes[0 * size * size + col + row * size] = rng.gen(); // Empty
+          vertex_hashes[1 * size * size + col + row * size] = rng.gen(); // Black
+          vertex_hashes[2 * size * size + col + row * size] = rng.gen(); // White
+          // Create initial board hash.
+          hash = hash ^ vertex_hashes[0 * size * size + col + row * size];
+        }
         let Vertex(v) = GoGame::vertex(row as u16, col as u16);
         board[v as usize] = Stone::Empty;
       }
@@ -99,11 +101,16 @@ impl GoGame {
       liberties: vec![],
     });
 
+    let past_position_hashes = if cfg!(debug) {
+      collections::HashSet::with_capacity(500)
+    } else {
+      collections::HashSet::new()
+    };
     GoGame {
       size: size,
       board: board,
       vertex_hashes: vertex_hashes,
-      past_position_hashes: collections::HashSet::with_capacity(500),
+      past_position_hashes: past_position_hashes,
       position_hash: hash,
       strings: strings,
       string_index: vec![0; 21 * 21],
@@ -128,15 +135,19 @@ impl GoGame {
 
   fn set_stone(&mut self, stone: Stone, vertex: Vertex) {
     // Remove hash for old stone.
-    self.position_hash = self.position_hash ^ self.hash_for(vertex);
+    if cfg!(debug) {
+      self.position_hash = self.position_hash ^ self.hash_for(vertex);
+    }
     // Place new stone and apply hash for it.
     let Vertex(v) = vertex;
     self.board[v as usize] = stone;
-    self.position_hash = self.position_hash ^ self.hash_for(vertex);
+    if cfg!(debug) {
+      self.position_hash = self.position_hash ^ self.hash_for(vertex);
+    }
   }
 
   pub fn play(&mut self, stone: Stone, vertex: Vertex) -> bool {
-    if !self.can_play(stone, vertex) {
+    if cfg!(debug) && !self.can_play(stone, vertex) {
       return false;
     }
     self.last_single_capture = None;
@@ -144,7 +155,9 @@ impl GoGame {
     self.set_stone(stone, vertex);
     self.remove_liberty_from_neighbouring_groups(vertex);
     self.capture_dead_groups(vertex, stone);
-    self.check_ko();
+    if cfg!(debug) {
+      self.check_ko();
+    }
     return true;
   }
 
