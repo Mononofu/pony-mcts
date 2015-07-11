@@ -27,9 +27,10 @@ fn benchmark_run(num_playouts: i32) -> time::Duration {
   let mut rng = rand::StdRng::from_seed(&[42]);
   let mut num_moves = 0u64;
   let mut double_total_score = 0i64;
+  let mut game = go::GoGame::new(19);
   let mut num_black_wins = 0u64;
   for _ in 0 .. num_playouts {
-    let (n, s) = play(&mut rng);
+    let (n, s) = play(&mut game, &mut rng);
     num_moves += n as u64;
     double_total_score += s as i64;
     if s > 0 {
@@ -46,13 +47,13 @@ fn benchmark_run(num_playouts: i32) -> time::Duration {
   return total;
 }
 
-fn play(rng: &mut rand::StdRng) -> (u32, i16) {
+fn play(game: &mut go::GoGame, rng: &mut rand::StdRng) -> (u32, i16) {
   // Use doubled score so we can score 0.5 komi in integer.
   let double_komi = 15;
-  let mut game = go::GoGame::new(19);
   let mut color_to_play = go::Stone::White;
   let mut num_consecutive_passes = 0;
   let mut num_moves = 0;
+  game.reset();
 
   'outer: while num_consecutive_passes < 2 {
     color_to_play = color_to_play.opponent();
