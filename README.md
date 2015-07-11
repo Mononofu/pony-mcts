@@ -7,6 +7,9 @@ v 0.1: full implementation of the Go rules, including ko detection. Supports com
 For comparison, [libego](https://github.com/lukaszlew/libego) does about 7.6 k playouts / second, or 0.13 ms per playout.
 
 
+- 2015-07-11: giant speedup by switching to libego inspired pseudo-liberties!
+  |PT1.661183028S---PT1.666016963S---PT1.695869809S|, mean PT1.668791982S +- PT0.030115182S
+  That's about 6k playouts per second! Nearly the same speed as libego now.
 - 2015-07-11: some slowdown after fixing ko-handling:
   |PT2.625271934S---PT2.635295411S---PT2.669489677S|, mean PT2.639132334S +- PT0.047698041S
 - 2015-07-11: explicit list of empty vertices speeds up selecting random moves a bit:
