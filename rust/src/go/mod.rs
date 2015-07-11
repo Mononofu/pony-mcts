@@ -449,19 +449,6 @@ impl GoGame {
     return false;
   }
 
-  pub fn empty_vertices(&mut self) -> Vec<Vertex>  {
-    let mut moves = Vec::with_capacity(self.size * self.size);
-    for row in 0 .. self.size {
-      for col in 0 .. self.size {
-        let vertex = GoGame::vertex(row as i16, col as i16);
-        if self.board[vertex.as_index()] == Stone::Empty {
-          moves.push(vertex);
-        }
-      }
-    }
-    return moves;
-  }
-
   pub fn random_move(&self, stone: Stone, rng: &mut rand::StdRng) -> Vertex {
     let num_empty = self.empty_vertices.len();
     let start_vertex = rng.gen_range(0, num_empty);
@@ -483,16 +470,8 @@ impl GoGame {
   }
 
   pub fn possible_moves(&mut self, stone: Stone) -> Vec<Vertex> {
-    let mut moves = Vec::new();
-    for row in 0 .. self.size {
-      for col in 0 .. self.size {
-        let v = GoGame::vertex(row as i16, col as i16);
-        if self.can_play(stone, v) {
-          moves.push(v);
-        }
-      }
-    }
-    return moves;
+    return self.empty_vertices.iter().map(|v| v.clone())
+      .filter(|v| self.can_play(stone, *v)).collect::<Vec<_>>();
   }
 }
 
