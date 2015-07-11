@@ -83,7 +83,7 @@ pub struct GoGame {
   empty_v_index: Vec<usize>,
 
 
-  last_single_capture: Option<Vertex>,
+  ko_vertex: Vertex,
 }
 
 impl GoGame {
@@ -141,7 +141,7 @@ impl GoGame {
       empty_vertices: empty_vertices,
       empty_v_index: empty_v_index,
 
-      last_single_capture: None,
+      ko_vertex: PASS,
     }
   }
 
@@ -188,11 +188,25 @@ impl GoGame {
     if cfg!(debug) && !self.can_play(stone, vertex) {
       return false;
     }
-    self.last_single_capture = None;
+    let old_num_empty_vertices = self.empty_vertices.len();
+    let mut played_in_enemy_eye = true;
+    for n in GoGame::neighbours(vertex) {
+      let s = self.stone_at(n);
+      if s == stone || s == Stone::Empty {
+        played_in_enemy_eye = false;
+      }
+    }
+    self.ko_vertex = PASS;
+
     self.join_groups_around(vertex, stone);
     self.set_stone(stone, vertex);
     self.remove_liberty_from_neighbouring_groups(vertex);
     self.capture_dead_groups(vertex, stone);
+
+    if played_in_enemy_eye && old_num_empty_vertices == self.empty_vertices.len() {
+      self.ko_vertex = *self.empty_vertices.last().unwrap();
+    }
+
     if cfg!(debug) {
       self.check_ko();
     }
@@ -231,19 +245,10 @@ impl GoGame {
   }
 
   fn capture_dead_groups(&mut self, vertex: Vertex, stone: Stone) {
-    let mut single_capture = None;
-    let mut num_captures = 0;
     for n in GoGame::neighbours(vertex) {
       if self.stone_at(n) == stone.opponent() && self.dead(n) {
-        if self.string(n).num_stones == 1 {
-          single_capture = Some(n);
-        }
-        num_captures += 1;
         self.remove_group(n);
       }
-    }
-    if num_captures == 1 {
-      self.last_single_capture = single_capture;
     }
   }
 
@@ -380,16 +385,9 @@ impl GoGame {
   }
 
   pub fn can_play(&self, stone: Stone, vertex: Vertex) -> bool {
-    // Can't play if the vertex is not empty.
-    if self.stone_at(vertex) != Stone::Empty {
+    // Can't play if the vertex is not empty or would be ko.
+    if self.stone_at(vertex) != Stone::Empty || vertex == self.ko_vertex {
       return false;
-    }
-
-    // Detect ko.
-    if let Some(v) = self.last_single_capture {
-      if v == vertex {
-        return false;
-      }
     }
 
     // Can definitely play if the placed stone will have at least one direct
