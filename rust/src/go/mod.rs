@@ -59,7 +59,7 @@ struct String {
   color: Stone,
   num_stones: u16,
 
-  num_liberties: u8,
+  num_pseudo_liberties: u8,
   liberty_vertex_sum: u16,
   liberty_vertex_sum_squared: u32,
 }
@@ -68,26 +68,31 @@ impl String {
   fn reset(&mut self) {
     self.color = Stone::Empty;
     self.num_stones = 0;
-    self.num_liberties = 0;
+    self.num_pseudo_liberties = 0;
     self.liberty_vertex_sum = 0;
     self.liberty_vertex_sum_squared = 0;
   }
 
   fn merge(&mut self, other: &String) {
     self.num_stones += other.num_stones;
-    self.num_liberties += other.num_liberties;
+    self.num_pseudo_liberties += other.num_pseudo_liberties;
     self.liberty_vertex_sum += other.liberty_vertex_sum;
     self.liberty_vertex_sum_squared += other.liberty_vertex_sum_squared;
   }
 
+  fn in_atari(&self) -> bool {
+    return self.num_pseudo_liberties as u32 * self.liberty_vertex_sum_squared  ==
+      self.liberty_vertex_sum as u32 * self.liberty_vertex_sum as u32;
+  }
+
   fn add_liberty(&mut self, vertex: Vertex) {
-    self.num_liberties += 1;
+    self.num_pseudo_liberties += 1;
     self.liberty_vertex_sum += vertex.0 as u16;
     self.liberty_vertex_sum_squared += vertex.0 as u32 * vertex.0 as u32;
   }
 
   fn remove_liberty(&mut self, vertex: Vertex) {
-    self.num_liberties -= 1;
+    self.num_pseudo_liberties -= 1;
     self.liberty_vertex_sum -= vertex.0 as u16;
     self.liberty_vertex_sum_squared -= vertex.0 as u32 * vertex.0 as u32;
   }
@@ -156,7 +161,7 @@ impl GoGame {
       color: Stone::Empty,
       num_stones: 0,
 
-      num_liberties: 4,
+      num_pseudo_liberties: 4,
       liberty_vertex_sum: 32768, // 2 ^ 15
       liberty_vertex_sum_squared: 2147483648, // 2 ^ 31
     }; 21 * 21];
@@ -303,7 +308,7 @@ impl GoGame {
   }
 
   fn num_pseudo_liberties(&self, vertex: Vertex) -> u8 {
-    return self.string(vertex).num_liberties;
+    return self.string(vertex).num_pseudo_liberties;
   }
 
   fn join_groups_around(&mut self, vertex: Vertex, stone: Stone) {
@@ -364,7 +369,7 @@ impl GoGame {
 
 
   fn dead(&self, vertex: Vertex) -> bool {
-    return self.string(vertex).num_liberties == 0;
+    return self.string(vertex).num_pseudo_liberties == 0;
   }
 
   fn remove_group(&mut self, vertex: Vertex) {
@@ -454,14 +459,14 @@ impl GoGame {
     // Allow to play if the placed stones connects to a group that still has at
     // least one other liberty after connecting.
     for n in GoGame::neighbours(vertex) {
-      if self.stone_at(n) == stone && self.string(n).num_liberties > 1 {
+      if self.stone_at(n) == stone && !self.string(n).in_atari() {
         return true;
       }
     }
 
     // Allow to play if the placed stone will kill at least one group.
     for n in GoGame::neighbours(vertex) {
-      if self.stone_at(n) == stone.opponent() && self.string(n).num_liberties == 1 {
+      if self.stone_at(n) == stone.opponent() && self.string(n).in_atari() {
         return true;
       }
     }
