@@ -76,6 +76,13 @@ pub struct GoGame {
   // same String. Cyclic, indexed by Vertex.
   string_next_v: Vec<Vertex>,
 
+  // Vector of all empty vertices.
+  empty_vertices: Vec<Vertex>,
+  // Position of every vertex in the vector above, to allow constant time
+  // removal and addition.
+  empty_v_index: Vec<usize>,
+
+
   last_single_capture: Option<Vertex>,
 }
 
@@ -86,6 +93,8 @@ impl GoGame {
     let mut board = vec![Stone::Border; 21 * 21];
     let mut hash = 0;
     let mut vertex_hashes =  if cfg!(debug) { vec![0; 3 * board.len()] } else { vec![] };
+    let mut empty_vertices = Vec::with_capacity(size * size);
+    let mut empty_v_index = vec![0; 21 * 21];
     for col in 0 .. size {
       for row in 0 .. size {
         if cfg!(debug) {
@@ -95,7 +104,12 @@ impl GoGame {
           // Create initial board hash.
           hash = hash ^ vertex_hashes[0 * size * size + col + row * size];
         }
-        board[GoGame::vertex(row as i16, col as i16).as_index()] = Stone::Empty;
+
+        let v = GoGame::vertex(row as i16, col as i16);
+        board[v.as_index()] = Stone::Empty;
+
+        empty_v_index[v.as_index()] = empty_vertices.len();
+        empty_vertices.push(v);
       }
     }
 
@@ -115,12 +129,18 @@ impl GoGame {
     GoGame {
       size: size,
       board: board,
+
       vertex_hashes: vertex_hashes,
       past_position_hashes: past_position_hashes,
       position_hash: hash,
+
       strings: strings,
       string_index: vec![0; 21 * 21],
       string_next_v: vec![Vertex(0); 21 * 21],
+
+      empty_vertices: empty_vertices,
+      empty_v_index: empty_v_index,
+
       last_single_capture: None,
     }
   }
@@ -148,6 +168,19 @@ impl GoGame {
     self.board[vertex.as_index()] = stone;
     if cfg!(debug) {
       self.position_hash = self.position_hash ^ self.hash_for(vertex);
+    }
+
+    // Update empty vertex list.
+    if stone == Stone::Empty {
+      self.empty_v_index[vertex.as_index()] = self.empty_vertices.len();
+      self.empty_vertices.push(vertex);
+    } else {
+      let i = self.empty_v_index[vertex.as_index()];
+      {
+        let last = self.empty_vertices.last().unwrap();
+        self.empty_v_index[last.as_index()] = i;
+      }
+      self.empty_vertices.swap_remove(i);
     }
   }
 
@@ -432,19 +465,20 @@ impl GoGame {
   }
 
   pub fn random_move(&self, stone: Stone, rng: &mut rand::StdRng) -> Vertex {
-    let num_vertices = 21 * (self.size as i16 + 1);
-    let start_vertex = rng.gen_range(22, num_vertices);
-    let mut v = start_vertex;
+    let num_empty = self.empty_vertices.len();
+    let start_vertex = rng.gen_range(0, num_empty);
+    let mut i = start_vertex;
 
     loop {
-      if self.can_play(stone, Vertex(v)) {
-        return Vertex(v);
+      let v = self.empty_vertices[i];
+      if self.can_play(stone, v) {
+        return v;
       }
-      v += 1;
-      if v == num_vertices {
-        v = 0;
+      i += 1;
+      if i == num_empty {
+        i = 0;
       }
-      if v == start_vertex {
+      if i == start_vertex {
         return PASS;
       }
     }
