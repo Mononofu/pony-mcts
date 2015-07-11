@@ -6,7 +6,9 @@ v 0.1: full implementation of the Go rules, including ko detection. Supports com
 
 For comparison, [libego](https://github.com/lukaszlew/libego) does about 7.6 k playouts / second, or 0.13 ms per playout.
 
-
+- 2015-07-11: bit of a false alarm, not quite that fast after fixing atari detection:
+  |PT1.952084253S---PT1.964127458S---PT1.993767023S|, mean PT1.966033600S +- PT0.041374833S
+  On the plus side, win rates are a more expected 45% now.
 - 2015-07-11: giant speedup by switching to libego inspired pseudo-liberties!
   |PT1.661183028S---PT1.666016963S---PT1.695869809S|, mean PT1.668791982S +- PT0.030115182S
   That's about 6k playouts per second! Nearly the same speed as libego now.
