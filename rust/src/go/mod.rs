@@ -64,12 +64,18 @@ struct String {
 pub struct GoGame {
   size: usize,
   board: Vec<Stone>,
+
   vertex_hashes: Vec<u64>,
   past_position_hashes: collections::HashSet<u64>,
   position_hash: u64,
+
   strings: Vec<String>,
+  // Index of the string every Vertex belongs to.
   string_index: Vec<usize>,
+  // Implicit representation of the linked list of all stones belonging to the
+  // same String. Cyclic, indexed by Vertex.
   string_next_v: Vec<Vertex>,
+
   last_single_capture: Option<Vertex>,
 }
 
