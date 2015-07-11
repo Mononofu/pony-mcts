@@ -26,18 +26,29 @@ fn benchmark_run(num_playouts: i32) -> time::Duration {
   let start = time::PreciseTime::now();
   let mut rng = rand::StdRng::from_seed(&[42]);
   let mut num_moves = 0u64;
+  let mut double_total_score = 0i64;
+  let mut num_black_wins = 0u64;
   for _ in 0 .. num_playouts {
-    let n = play(&mut rng);
+    let (n, s) = play(&mut rng);
     num_moves += n as u64;
+    double_total_score += s as i64;
+    if s > 0 {
+      num_black_wins += 1;
+    }
   }
   let total = start.to(time::PreciseTime::now());
   println!("{} playouts in {}, {:.2} kpps", num_playouts, total,
       num_playouts as f64 / total.num_milliseconds() as f64);
-  println!("{} moves per playout", num_moves as f64 / num_playouts as f64);
+  println!("{} moves per playout, mean score {:.2}, winrate {:.2} %",
+      num_moves as f64 / num_playouts as f64,
+      double_total_score as f64 / num_playouts as f64 / 2f64,
+      100f64 * num_black_wins as f64 / num_playouts as f64);
   return total;
 }
 
-fn play(rng: &mut rand::StdRng) -> u32 {
+fn play(rng: &mut rand::StdRng) -> (u32, i16) {
+  // Use doubled score so we can score 0.5 komi in integer.
+  let double_komi = 15;
   let mut game = go::GoGame::new(19);
   let mut color_to_play = go::Stone::White;
   let mut num_consecutive_passes = 0;
@@ -61,5 +72,5 @@ fn play(rng: &mut rand::StdRng) -> u32 {
       break;
     }
   }
-  return num_moves;
+  return (num_moves, game.chinese_score() * 2 - double_komi);
 }

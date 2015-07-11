@@ -82,6 +82,8 @@ pub struct GoGame {
   // removal and addition.
   empty_v_index: Vec<usize>,
 
+  num_black_stones: i16,
+
 
   ko_vertex: Vertex,
 }
@@ -141,6 +143,8 @@ impl GoGame {
       empty_vertices: empty_vertices,
       empty_v_index: empty_v_index,
 
+      num_black_stones: 0,
+
       ko_vertex: PASS,
     }
   }
@@ -160,6 +164,7 @@ impl GoGame {
   }
 
   fn set_stone(&mut self, stone: Stone, vertex: Vertex) {
+    let old_stone = self.board[vertex.as_index()];
     // Remove hash for old stone.
     if cfg!(debug) {
       self.position_hash = self.position_hash ^ self.hash_for(vertex);
@@ -181,6 +186,13 @@ impl GoGame {
         self.empty_v_index[last.as_index()] = i;
       }
       self.empty_vertices.swap_remove(i);
+    }
+
+    // Update stone count for scoring.
+    if old_stone == Stone::Black {
+      self.num_black_stones -= 1;
+    } else if stone == Stone::Black {
+      self.num_black_stones += 1;
     }
   }
 
@@ -472,6 +484,36 @@ impl GoGame {
   pub fn possible_moves(&mut self, stone: Stone) -> Vec<Vertex> {
     return self.empty_vertices.iter().map(|v| v.clone())
       .filter(|v| self.can_play(stone, *v)).collect::<Vec<_>>();
+  }
+
+  pub fn chinese_score(&self) -> i16 {
+    let num_white_stones = (self.size * self.size) as i16 - self.num_black_stones - self.empty_vertices.len() as i16;
+
+    let mut eye_score = 0;
+    for v in self.empty_vertices.iter() {
+      let mut num_black = 0;
+      let mut num_white = 0;
+
+      for n in GoGame::neighbours(*v) {
+        let s = self.stone_at(n);
+        if s == Stone::Black {
+          num_black += 1;
+        } else if s == Stone::White {
+          num_white += 1;
+        } else {
+          num_black += 1;
+          num_white += 1;
+        }
+      }
+
+      if num_black == 4 {
+        eye_score += 1;
+      } else if num_white == 4 {
+        eye_score -= 1;
+      }
+    }
+
+    return self.num_black_stones - num_white_stones + eye_score;
   }
 }
 
