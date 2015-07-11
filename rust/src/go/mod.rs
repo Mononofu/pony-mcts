@@ -61,6 +61,12 @@ struct String {
   liberties: Vec<Vertex>,
 }
 
+impl String {
+  fn add_liberty(&mut self, vertex: Vertex) {
+
+  }
+}
+
 pub struct GoGame {
   size: usize,
   board: Vec<Stone>,
@@ -299,6 +305,8 @@ impl GoGame {
       if self.stone_at(n) == stone {
         let string_i = self.string_index[n.as_index()];
         if string_i != largest_group_i {
+          // Set all the stones in the smaller string to be part of the larger
+          // string.
           let mut cur = n;
           loop {
             self.string_index[cur.as_index()] = largest_group_i;
@@ -307,6 +315,9 @@ impl GoGame {
               break;
             }
           }
+
+          // Connect the two linked lists representing the stones in the two
+          // strings.
           let tmp = self.string_next_v[largest_group_v.as_index()];
           self.string_next_v[largest_group_v.as_index()] = self.string_next_v[n.as_index()];
           self.string_next_v[n.as_index()] = tmp;
