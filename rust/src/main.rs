@@ -1,5 +1,4 @@
 extern crate rand;
-use rand::Rng;
 use rand::SeedableRng;
 extern crate time;
 
