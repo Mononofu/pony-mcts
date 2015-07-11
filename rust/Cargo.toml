@@ -8,3 +8,11 @@ authors = [ "Julian Schrittwieser <mcts@furidamu.org>" ]
 
 rand="*"
 time="*"
+
+[profile.release]
+opt-level = 3
+debug = true
+rpath = false
+lto = false
+debug-assertions = false
+codegen-units = 1
