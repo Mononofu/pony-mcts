@@ -42,8 +42,8 @@ impl Vertex {
 impl fmt::Display for Vertex {
   fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
     let (x, y) = self.to_coords();
-    let column_labels = "ABCDEFGHIKLMNOPORSTU";
-    try!(write!(f, "{}", column_labels.chars().nth(x as usize).unwrap()));
+    let column_labels = "aABCDEFGHIKLMNOPORSTUu";
+    try!(write!(f, "{}", column_labels.chars().nth((x + 1) as usize).unwrap()));
     return write!(f, "{}", y + 1);
   }
 }
@@ -58,12 +58,38 @@ impl fmt::Debug for Vertex {
 struct String {
   color: Stone,
   num_stones: u16,
-  liberties: Vec<Vertex>,
+
+  num_liberties: u8,
+  liberty_vertex_sum: u16,
+  liberty_vertex_sum_squared: u32,
 }
 
 impl String {
-  fn add_liberty(&mut self, vertex: Vertex) {
+  fn reset(&mut self) {
+    self.color = Stone::Empty;
+    self.num_stones = 0;
+    self.num_liberties = 0;
+    self.liberty_vertex_sum = 0;
+    self.liberty_vertex_sum_squared = 0;
+  }
 
+  fn merge(&mut self, other: &String) {
+    self.num_stones += other.num_stones;
+    self.num_liberties += other.num_liberties;
+    self.liberty_vertex_sum += other.liberty_vertex_sum;
+    self.liberty_vertex_sum_squared += other.liberty_vertex_sum_squared;
+  }
+
+  fn add_liberty(&mut self, vertex: Vertex) {
+    self.num_liberties += 1;
+    self.liberty_vertex_sum += vertex.0 as u16;
+    self.liberty_vertex_sum_squared += vertex.0 as u32 * vertex.0 as u32;
+  }
+
+  fn remove_liberty(&mut self, vertex: Vertex) {
+    self.num_liberties -= 1;
+    self.liberty_vertex_sum -= vertex.0 as u16;
+    self.liberty_vertex_sum_squared -= vertex.0 as u32 * vertex.0 as u32;
   }
 }
 
@@ -76,8 +102,8 @@ pub struct GoGame {
   position_hash: u64,
 
   strings: Vec<String>,
-  // Index of the string every Vertex belongs to.
-  string_index: Vec<usize>,
+  // Head of the string for every vertex of the board.
+  string_head: Vec<Vertex>,
   // Implicit representation of the linked list of all stones belonging to the
   // same String. Cyclic, indexed by Vertex.
   string_next_v: Vec<Vertex>,
@@ -89,7 +115,6 @@ pub struct GoGame {
   empty_v_index: Vec<usize>,
 
   num_black_stones: i16,
-
 
   ko_vertex: Vertex,
 }
@@ -121,13 +146,20 @@ impl GoGame {
       }
     }
 
-    let mut strings = Vec::with_capacity(500);
-    // Add a null string.
-    strings.push(String{
+
+    let mut string_head = vec![PASS; 21 * 21];
+    for i in 0 .. 21 * 21 {
+      string_head[i] = Vertex(i as i16);
+    }
+
+    let strings = vec![String{
       color: Stone::Empty,
       num_stones: 0,
-      liberties: vec![],
-    });
+
+      num_liberties: 4,
+      liberty_vertex_sum: 32768, // 2 ^ 15
+      liberty_vertex_sum_squared: 2147483648, // 2 ^ 31
+    }; 21 * 21];
 
     let past_position_hashes = if cfg!(debug) {
       collections::HashSet::with_capacity(500)
@@ -143,8 +175,8 @@ impl GoGame {
       position_hash: hash,
 
       strings: strings,
-      string_index: vec![0; 21 * 21],
-      string_next_v: vec![Vertex(0); 21 * 21],
+      string_head: string_head,
+      string_next_v: vec![PASS; 21 * 21],
 
       empty_vertices: empty_vertices,
       empty_v_index: empty_v_index,
@@ -232,33 +264,22 @@ impl GoGame {
   }
 
   fn place_new_stone_as_string(&mut self, vertex: Vertex, stone: Stone) {
-    let mut liberties = Vec::new();
+    self.strings[vertex.as_index()].reset();
+    self.strings[vertex.as_index()].num_stones += 1;
+
     for n in GoGame::neighbours(vertex) {
       if self.stone_at(n) == Stone::Empty {
-        liberties.push(n);
+        self.strings[vertex.as_index()].add_liberty(n);
       }
     }
-    liberties.sort();
 
-    self.string_index[vertex.as_index()] = self.strings.len();
+    self.string_head[vertex.as_index()] = vertex;
     self.string_next_v[vertex.as_index()] = vertex;
-    self.strings.push(String{
-      color: stone,
-      num_stones: 1,
-      liberties: liberties,
-    });
   }
 
   fn remove_liberty_from_neighbouring_groups(&mut self, vertex: Vertex) {
     for n in GoGame::neighbours(vertex) {
-      let string_index = self.string_index[n.as_index()];
-      if string_index != 0 {
-        let liberties = &mut self.strings[string_index].liberties;
-        match liberties.binary_search(&vertex) {
-          Ok(i) => { liberties.remove(i); () },
-          Err(_) => (),
-        };
-      }
+      self.strings[self.string_head[n.as_index()].as_index()].remove_liberty(vertex);
     }
   }
 
@@ -278,20 +299,22 @@ impl GoGame {
   }
 
   fn string(&self, vertex: Vertex) -> &String {
-    return &self.strings[self.string_index[vertex.as_index()]];
+    return &self.strings[self.string_head[vertex.as_index()].as_index()];
+  }
+
+  fn num_pseudo_liberties(&self, vertex: Vertex) -> u8 {
+    return self.string(vertex).num_liberties;
   }
 
   fn join_groups_around(&mut self, vertex: Vertex, stone: Stone) {
-    let mut largest_group_v = PASS;
+    let mut largest_group_head = PASS;
     let mut largest_group_size = 0;
-    let mut largest_group_i = -1;
     for n in GoGame::neighbours(vertex) {
       if self.stone_at(n) == stone {
         let string = self.string(n);
         if string.num_stones > largest_group_size {
           largest_group_size = string.num_stones;
-          largest_group_v = n;
-          largest_group_i = self.string_index[n.as_index()];
+          largest_group_head = self.string_head[n.as_index()];
         }
       }
     }
@@ -303,13 +326,13 @@ impl GoGame {
 
     for n in GoGame::neighbours(vertex) {
       if self.stone_at(n) == stone {
-        let string_i = self.string_index[n.as_index()];
-        if string_i != largest_group_i {
+        let string_head = self.string_head[n.as_index()];
+        if string_head != largest_group_head {
           // Set all the stones in the smaller string to be part of the larger
           // string.
           let mut cur = n;
           loop {
-            self.string_index[cur.as_index()] = largest_group_i;
+            self.string_head[cur.as_index()] = largest_group_head;
             cur = self.string_next_v[cur.as_index()];
             if cur == n {
               break;
@@ -318,72 +341,48 @@ impl GoGame {
 
           // Connect the two linked lists representing the stones in the two
           // strings.
-          let tmp = self.string_next_v[largest_group_v.as_index()];
-          self.string_next_v[largest_group_v.as_index()] = self.string_next_v[n.as_index()];
+          let tmp = self.string_next_v[largest_group_head.as_index()];
+          self.string_next_v[largest_group_head.as_index()] = self.string_next_v[n.as_index()];
           self.string_next_v[n.as_index()] = tmp;
-          self.strings[largest_group_i].num_stones += self.strings[string_i].num_stones;
-
-          let mut liberties = vec![];
-          {
-            use std::mem::swap;
-            mem::swap(&mut self.strings[string_i].liberties, &mut liberties);
-          }
-
-          for l in liberties.iter() {
-            let mut libs = &mut self.strings[largest_group_i].liberties;
-            match libs.binary_search(&l) {
-              Ok(_) => (),
-              Err(i) => libs.insert(i, l.clone()),
-            };
-          }
+          let old = self.strings[string_head.as_index()].clone();
+          self.strings[largest_group_head.as_index()].merge(&old);
         }
       }
     }
 
-    self.string_next_v[vertex.as_index()] = self.string_next_v[largest_group_v.as_index()];
-    self.string_next_v[largest_group_v.as_index()] = vertex;
-    self.strings[largest_group_i].num_stones += 1;
-    self.string_index[vertex.as_index()] = largest_group_i;
+    self.string_next_v[vertex.as_index()] = self.string_next_v[largest_group_head.as_index()];
+    self.string_next_v[largest_group_head.as_index()] = vertex;
+    self.strings[largest_group_head.as_index()].num_stones += 1;
+    self.string_head[vertex.as_index()] = largest_group_head;
 
     for n in GoGame::neighbours(vertex) {
       if self.stone_at(n) == Stone::Empty {
-        let mut libs = &mut self.strings[largest_group_i].liberties;
-        match libs.binary_search(&n) {
-          Ok(_) => (),
-          Err(i) => libs.insert(i, n.clone()),
-        };
+        self.strings[largest_group_head.as_index()].add_liberty(n);
       }
     }
   }
 
-  fn liberties(&self, vertex: Vertex) -> &Vec<Vertex> {
-    return &self.string(vertex).liberties;
-  }
 
   fn dead(&self, vertex: Vertex) -> bool {
-    return self.string_index[vertex.as_index()] == 0 ||
-        self.string(vertex).liberties.len() == 0;
+    return self.string(vertex).num_liberties == 0;
   }
 
   fn remove_group(&mut self, vertex: Vertex) {
     let mut cur = vertex;
-    let string_index = self.string_index[vertex.as_index()];
+    let string_head = self.string_head[vertex.as_index()];
 
     loop {
       self.set_stone(Stone::Empty, cur);
-      self.string_index[cur.as_index()] = 0;
+      self.string_head[cur.as_index()] = cur;
+      self.strings[cur.as_index()].reset();
 
       for &n in GoGame::neighbours(cur).iter() {
         let stone = self.board[n.as_index()];
 
         if stone == Stone::White || stone == Stone::Black {
-          let neighbour_string_i = self.string_index[n.as_index()];
-          if neighbour_string_i != string_index {
-            let liberties = &mut self.strings[neighbour_string_i].liberties;
-            match liberties.binary_search(&cur) {
-              Ok(_) => (),
-              Err(i) => liberties.insert(i, cur),
-            };
+          let neighbour_string_head = self.string_head[n.as_index()];
+          if neighbour_string_head != string_head {
+            self.strings[neighbour_string_head.as_index()].add_liberty(cur);
           }
         }
       }
@@ -455,15 +454,14 @@ impl GoGame {
     // Allow to play if the placed stones connects to a group that still has at
     // least one other liberty after connecting.
     for n in GoGame::neighbours(vertex) {
-      if self.stone_at(n) == stone && self.string(n).liberties.len() > 1 {
+      if self.stone_at(n) == stone && self.string(n).num_liberties > 1 {
         return true;
       }
     }
 
     // Allow to play if the placed stone will kill at least one group.
     for n in GoGame::neighbours(vertex) {
-      if self.stone_at(n) == stone.opponent() && self.string(n).liberties.len() == 1 &&
-          self.string(n).liberties.first() == Some(&vertex) {
+      if self.stone_at(n) == stone.opponent() && self.string(n).num_liberties == 1 {
         return true;
       }
     }
