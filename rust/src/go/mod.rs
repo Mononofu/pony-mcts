@@ -9,15 +9,15 @@ use std::collections;
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
 pub struct Stone(u8);
 
-pub mod Stone {
+pub mod stone {
   use super::Stone;
 
-  pub const Empty: Stone = Stone(0);
-  pub const Black: Stone = Stone(1);
-  pub const White: Stone = Stone(2);
-  pub const Border: Stone = Stone(3);
+  pub const EMPTY: Stone = Stone(0);
+  pub const BLACK: Stone = Stone(1);
+  pub const WHITE: Stone = Stone(2);
+  pub const BORDER: Stone = Stone(3);
 
-  pub static OPPONENT: [Stone; 4] = [Empty, White, Black, Border];
+  pub static OPPONENT: [Stone; 4] = [EMPTY, WHITE, BLACK, BORDER];
 
   impl Stone {
     pub fn opponent(self) -> Stone {
@@ -78,7 +78,7 @@ struct String {
 
 impl String {
   fn reset(&mut self) {
-    self.color = Stone::Empty;
+    self.color = stone::EMPTY;
     self.num_stones = 0;
     self.num_pseudo_liberties = 0;
     self.liberty_vertex_sum = 0;
@@ -89,7 +89,7 @@ impl String {
   // board that is available for playing.
   // This removes the need for bounds checking.
   fn reset_border(&mut self) {
-    self.color = Stone::Empty;
+    self.color = stone::EMPTY;
     self.num_stones = 0;
     // Need to have values big enough that they can never go below 0 even if
     // all liberties are removed.
@@ -150,7 +150,7 @@ pub struct GoGame {
   empty_v_index: Vec<usize>,
 
   // Number of black stones on the board, for scoring at the end of the game.
-  // White stones can be deduced from this, board size and empty_vertices.
+  // WHITE stones can be deduced from this, board size and empty_vertices.
   num_black_stones: i16,
 
   // Vertex that can't be played on because it would be simple ko.
@@ -166,7 +166,7 @@ impl GoGame {
 
     let mut rng = rand::thread_rng();
 
-    let mut board = vec![Stone::Border; VIRT_LEN];
+    let mut board = vec![stone::BORDER; VIRT_LEN];
     let mut hash = 0;
     let mut vertex_hashes =  if cfg!(debug) { vec![0; 3 * board.len()] } else { vec![] };
     let mut empty_vertices = Vec::with_capacity(size * size);
@@ -174,15 +174,15 @@ impl GoGame {
     for col in 0 .. size {
       for row in 0 .. size {
         if cfg!(debug) {
-          vertex_hashes[0 * size * size + col + row * size] = rng.gen(); // Empty
-          vertex_hashes[1 * size * size + col + row * size] = rng.gen(); // Black
-          vertex_hashes[2 * size * size + col + row * size] = rng.gen(); // White
+          vertex_hashes[0 * size * size + col + row * size] = rng.gen(); // EMPTY
+          vertex_hashes[1 * size * size + col + row * size] = rng.gen(); // BLACK
+          vertex_hashes[2 * size * size + col + row * size] = rng.gen(); // WHITE
           // Create initial board hash.
           hash = hash ^ vertex_hashes[0 * size * size + col + row * size];
         }
 
         let v = GoGame::vertex(row as i16, col as i16);
-        board[v.as_index()] = Stone::Empty;
+        board[v.as_index()] = stone::EMPTY;
 
         empty_v_index[v.as_index()] = empty_vertices.len();
         empty_vertices.push(v);
@@ -196,7 +196,7 @@ impl GoGame {
     }
 
     let strings = vec![String{
-      color: Stone::Empty,
+      color: stone::EMPTY,
       num_stones: 0,
 
       num_pseudo_liberties: 4,
@@ -253,7 +253,7 @@ impl GoGame {
         }
 
         let v = GoGame::vertex(row as i16, col as i16);
-        self.board[v.as_index()] = Stone::Empty;
+        self.board[v.as_index()] = stone::EMPTY;
 
         self.empty_v_index[v.as_index()] = self.empty_vertices.len();
         self.empty_vertices.push(v);
@@ -270,10 +270,10 @@ impl GoGame {
   // Calculates zobrist hash for a vertex. Used for super-ko detection.
   fn hash_for(&self, vertex: Vertex) -> u64 {
     let offset = match self.stone_at(vertex) {
-      Stone::Empty => 0,
-      Stone::Black => 1,
-      Stone::White => 2,
-      Stone::Border => 3,
+      stone::EMPTY => 0,
+      stone::BLACK => 1,
+      stone::WHITE => 2,
+      stone::BORDER => 3,
       _ => panic!("unknown stone"),
     };
     return self.vertex_hashes[offset * self.size * self.size + vertex.as_index()];
@@ -292,7 +292,7 @@ impl GoGame {
     }
 
     // Update empty vertex list.
-    if stone == Stone::Empty {
+    if stone == stone::EMPTY {
       self.empty_v_index[vertex.as_index()] = self.empty_vertices.len();
       self.empty_vertices.push(vertex);
     } else {
@@ -305,9 +305,9 @@ impl GoGame {
     }
 
     // Update stone count for scoring.
-    if old_stone == Stone::Black {
+    if old_stone == stone::BLACK {
       self.num_black_stones -= 1;
-    } else if stone == Stone::Black {
+    } else if stone == stone::BLACK {
       self.num_black_stones += 1;
     }
   }
@@ -322,7 +322,7 @@ impl GoGame {
     let mut played_in_enemy_eye = true;
     for n in NEIGHBOURS[vertex.as_index()].iter() {
       let s = self.stone_at(*n);
-      if s == stone || s == Stone::Empty {
+      if s == stone || s == stone::EMPTY {
         played_in_enemy_eye = false;
       }
     }
@@ -431,7 +431,7 @@ impl GoGame {
     self.string_head[vertex.as_index()] = largest_group_head;
 
     for n in NEIGHBOURS[vertex.as_index()].iter() {
-      if self.stone_at(*n) == Stone::Empty {
+      if self.stone_at(*n) == stone::EMPTY {
         self.strings[largest_group_head.as_index()].add_liberty(*n);
       }
     }
@@ -442,7 +442,7 @@ impl GoGame {
     self.strings[vertex.as_index()].num_stones += 1;
 
     for n in NEIGHBOURS[vertex.as_index()].iter() {
-      if self.stone_at(*n) == Stone::Empty {
+      if self.stone_at(*n) == stone::EMPTY {
         self.strings[vertex.as_index()].add_liberty(*n);
       }
     }
@@ -460,14 +460,14 @@ impl GoGame {
     let string_head = self.string_head[vertex.as_index()];
 
     loop {
-      self.set_stone(Stone::Empty, cur);
+      self.set_stone(stone::EMPTY, cur);
       self.string_head[cur.as_index()] = cur;
       self.strings[cur.as_index()].reset();
 
       for n in NEIGHBOURS[cur.as_index()].iter() {
         let stone = self.board[n.as_index()];
 
-        if stone == Stone::White || stone == Stone::Black {
+        if stone == stone::WHITE || stone == stone::BLACK {
           let neighbour_string_head = self.string_head[n.as_index()];
           if neighbour_string_head != string_head {
             self.strings[neighbour_string_head.as_index()].add_liberty(cur);
@@ -488,14 +488,14 @@ impl GoGame {
 
   pub fn can_play(&self, stone: Stone, vertex: Vertex) -> bool {
     // Can't play if the vertex is not empty or would be ko.
-    if self.stone_at(vertex) != Stone::Empty || vertex == self.ko_vertex {
+    if self.stone_at(vertex) != stone::EMPTY || vertex == self.ko_vertex {
       return false;
     }
 
     // Can definitely play if the placed stone will have at least one direct
     // freedom (can't be ko).
     for n in NEIGHBOURS[vertex.as_index()].iter() {
-      if self.stone_at(*n) == Stone::Empty {
+      if self.stone_at(*n) == stone::EMPTY {
         return true;
       }
     }
@@ -508,7 +508,7 @@ impl GoGame {
     let opponent = stone.opponent();
     for n in NEIGHBOURS[vertex.as_index()].iter() {
       let s = self.stone_at(*n);
-      if s == opponent || s == Stone::Empty {
+      if s == opponent || s == stone::EMPTY {
         surrounded_by_own = false;
         break;
       }
@@ -520,7 +520,7 @@ impl GoGame {
         let s = self.stone_at(*n);
         if s == opponent {
           enemy_count += 1;
-        } else if s == Stone::Border {
+        } else if s == stone::BORDER {
           border = 1;
         }
       }
@@ -585,9 +585,9 @@ impl GoGame {
 
       for n in NEIGHBOURS[v.as_index()].iter() {
         let s = self.stone_at(*n);
-        if s == Stone::Black {
+        if s == stone::BLACK {
           num_black += 1;
-        } else if s == Stone::White {
+        } else if s == stone::WHITE {
           num_white += 1;
         } else {
           num_black += 1;
@@ -619,8 +619,8 @@ impl fmt::Display for GoGame {
       try!(write!(f, " {:2} \x1b[43m\x1b[1;37m ", row + 1));
       for col in 0 .. self.size {
         try!(match self.stone_at(GoGame::vertex(col as i16, row as i16)) {
-          Stone::Black => write!(f, "\x1b[30m\u{25CF}\x1b[37m "),
-          Stone::White => write!(f, "\u{25CF} "),
+          stone::BLACK => write!(f, "\x1b[30m\u{25CF}\x1b[37m "),
+          stone::WHITE => write!(f, "\u{25CF} "),
           _ => write!(f, "\u{00b7} ")
         });
       }

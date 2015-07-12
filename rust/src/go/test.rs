@@ -1,5 +1,5 @@
 use super::GoGame;
-use super::Stone;
+use super::stone;
 use super::NEIGHBOURS;
 use super::DIAG_NEIGHBOURS;
 use super::VIRT_LEN;
@@ -10,8 +10,8 @@ use rand::SeedableRng;
 
 #[test]
 fn stone_opponent() {
-  assert_eq!(Stone::White, Stone::Black.opponent());
-  assert_eq!(Stone::Black, Stone::White.opponent());
+  assert_eq!(stone::WHITE, stone::BLACK.opponent());
+  assert_eq!(stone::BLACK, stone::WHITE.opponent());
 }
 
 #[test]
@@ -43,16 +43,16 @@ fn vertex_neighbours() {
 fn can_play_single_stone() {
   let mut game = GoGame::new(9);
   let v = GoGame::vertex(2, 2);
-  game.play(Stone::Black, v);
+  game.play(stone::BLACK, v);
   assert_eq!(4, game.num_pseudo_liberties(v));
-  assert_eq!(false, game.can_play(Stone::Black, v));
+  assert_eq!(false, game.can_play(stone::BLACK, v));
 }
 
 #[test]
 fn can_remove_liberties() {
   let mut game = GoGame::new(9);
-  game.play(Stone::Black, GoGame::vertex(2, 2));
-  game.play(Stone::White, GoGame::vertex(3, 2));
+  game.play(stone::BLACK, GoGame::vertex(2, 2));
+  game.play(stone::WHITE, GoGame::vertex(3, 2));
   assert_eq!(3, game.num_pseudo_liberties(GoGame::vertex(2, 2)));
   assert_eq!(3, game.num_pseudo_liberties(GoGame::vertex(3, 2)));
 }
@@ -61,76 +61,76 @@ fn can_remove_liberties() {
 fn can_join_strings() {
   let mut game = GoGame::new(9);
   let v = GoGame::vertex(2, 2);
-  game.play(Stone::Black, GoGame::vertex(2, 2));
-  game.play(Stone::Black, GoGame::vertex(3, 2));
+  game.play(stone::BLACK, GoGame::vertex(2, 2));
+  game.play(stone::BLACK, GoGame::vertex(3, 2));
   assert_eq!(6, game.num_pseudo_liberties(v));
 }
 
 #[test]
 fn can_capture_single_stone() {
   let mut game = GoGame::new(9);
-  game.play(Stone::White, GoGame::vertex(2, 2));
-  game.play(Stone::Black, GoGame::vertex(1, 2));
-  game.play(Stone::Black, GoGame::vertex(3, 2));
-  game.play(Stone::Black, GoGame::vertex(2, 1));
-  game.play(Stone::Black, GoGame::vertex(2, 3));
-  assert_eq!(Stone::Empty, game.stone_at(GoGame::vertex(2, 2)));
+  game.play(stone::WHITE, GoGame::vertex(2, 2));
+  game.play(stone::BLACK, GoGame::vertex(1, 2));
+  game.play(stone::BLACK, GoGame::vertex(3, 2));
+  game.play(stone::BLACK, GoGame::vertex(2, 1));
+  game.play(stone::BLACK, GoGame::vertex(2, 3));
+  assert_eq!(stone::EMPTY, game.stone_at(GoGame::vertex(2, 2)));
 }
 
 #[test]
 fn freedoms_after_capture() {
   let mut game = GoGame::new(9);
-  game.play(Stone::White, GoGame::vertex(0, 0));
-  game.play(Stone::Black, GoGame::vertex(1, 0));
-  game.play(Stone::Black, GoGame::vertex(1, 1));
-  game.play(Stone::Black, GoGame::vertex(0, 1));
-  assert_eq!(Stone::Empty, game.stone_at(GoGame::vertex(0, 0)));
+  game.play(stone::WHITE, GoGame::vertex(0, 0));
+  game.play(stone::BLACK, GoGame::vertex(1, 0));
+  game.play(stone::BLACK, GoGame::vertex(1, 1));
+  game.play(stone::BLACK, GoGame::vertex(0, 1));
+  assert_eq!(stone::EMPTY, game.stone_at(GoGame::vertex(0, 0)));
   assert_eq!(6, game.num_pseudo_liberties(GoGame::vertex(0, 1)));
 }
 
 #[test]
 fn initially_all_moves_possible() {
   let mut game = GoGame::new(9);
-  assert_eq!(game.possible_moves(Stone::Black).len(), 81);
+  assert_eq!(game.possible_moves(stone::BLACK).len(), 81);
 }
 
 #[test]
 fn forbid_filling_real_eye() {
   let mut game = GoGame::new(9);
-  game.play(Stone::Black, GoGame::vertex(0, 0));
-  game.play(Stone::Black, GoGame::vertex(0, 1));
-  game.play(Stone::Black, GoGame::vertex(0, 2));
-  game.play(Stone::Black, GoGame::vertex(1, 0));
-  game.play(Stone::Black, GoGame::vertex(1, 2));
-  game.play(Stone::Black, GoGame::vertex(2, 0));
-  game.play(Stone::Black, GoGame::vertex(2, 1));
-  assert_eq!(false, game.can_play(Stone::Black, GoGame::vertex(1, 1)));
+  game.play(stone::BLACK, GoGame::vertex(0, 0));
+  game.play(stone::BLACK, GoGame::vertex(0, 1));
+  game.play(stone::BLACK, GoGame::vertex(0, 2));
+  game.play(stone::BLACK, GoGame::vertex(1, 0));
+  game.play(stone::BLACK, GoGame::vertex(1, 2));
+  game.play(stone::BLACK, GoGame::vertex(2, 0));
+  game.play(stone::BLACK, GoGame::vertex(2, 1));
+  assert_eq!(false, game.can_play(stone::BLACK, GoGame::vertex(1, 1)));
 }
 
 #[test]
 fn forbid_filling_real_eyes_of_split_group() {
   let mut game = GoGame::new(9);
-  game.play(Stone::Black, GoGame::vertex(0, 0));
-  game.play(Stone::Black, GoGame::vertex(0, 2));
-  game.play(Stone::Black, GoGame::vertex(1, 1));
-  game.play(Stone::Black, GoGame::vertex(1, 2));
-  game.play(Stone::Black, GoGame::vertex(2, 0));
-  game.play(Stone::Black, GoGame::vertex(2, 1));
-  assert_eq!(false, game.can_play(Stone::Black, GoGame::vertex(0, 1)));
-  assert_eq!(false, game.can_play(Stone::Black, GoGame::vertex(1, 0)));
+  game.play(stone::BLACK, GoGame::vertex(0, 0));
+  game.play(stone::BLACK, GoGame::vertex(0, 2));
+  game.play(stone::BLACK, GoGame::vertex(1, 1));
+  game.play(stone::BLACK, GoGame::vertex(1, 2));
+  game.play(stone::BLACK, GoGame::vertex(2, 0));
+  game.play(stone::BLACK, GoGame::vertex(2, 1));
+  assert_eq!(false, game.can_play(stone::BLACK, GoGame::vertex(0, 1)));
+  assert_eq!(false, game.can_play(stone::BLACK, GoGame::vertex(1, 0)));
 }
 
 #[test]
 fn uniform_move_distribution() {
   let mut rng = rand::StdRng::from_seed(&[42]);
   let mut game = GoGame::new(9);
-  let num_valid_moves = game.possible_moves(Stone::Black).len() as f64;
+  let num_valid_moves = game.possible_moves(stone::BLACK).len() as f64;
   let num_samples = 100000;
   let mut count = vec![0; VIRT_LEN];
   for _ in 0 .. num_samples {
-    count[game.random_move(Stone::Black, &mut rng).as_index()] += 1;
+    count[game.random_move(stone::BLACK, &mut rng).as_index()] += 1;
   }
-  for v in game.possible_moves(Stone::Black) {
+  for v in game.possible_moves(stone::BLACK) {
     let frac = count[v.as_index()] as f64 / num_samples as f64 * num_valid_moves;
     assert!(frac > 0.9 && frac < 1.1, format!("{}", frac));
   }
@@ -139,8 +139,8 @@ fn uniform_move_distribution() {
 #[test]
 fn chinese_score_full_board() {
   let mut game = GoGame::new(9);
-  for v in game.possible_moves(Stone::Black) {
-    game.play(Stone::Black, v);
+  for v in game.possible_moves(stone::BLACK) {
+    game.play(stone::BLACK, v);
   }
   assert_eq!(9*9, game.chinese_score());
 }
@@ -151,7 +151,7 @@ fn chinese_score_also_count_eyes() {
   for col in 0 .. MAX_SIZE as i16 {
     for row in 0 .. MAX_SIZE as i16 {
       if col + row % 2 == 0 {
-        game.play(Stone::Black, GoGame::vertex(col, row));
+        game.play(stone::BLACK, GoGame::vertex(col, row));
       }
     }
   }
@@ -162,9 +162,9 @@ fn chinese_score_also_count_eyes() {
 #[test]
 fn reset_game() {
   let mut game = GoGame::new(9);
-  assert_eq!(81, game.possible_moves(Stone::Black).len());
-  game.play(Stone::Black, GoGame::vertex(0, 0));
-  assert_eq!(80, game.possible_moves(Stone::Black).len());
+  assert_eq!(81, game.possible_moves(stone::BLACK).len());
+  game.play(stone::BLACK, GoGame::vertex(0, 0));
+  assert_eq!(80, game.possible_moves(stone::BLACK).len());
   game.reset();
-  assert_eq!(81, game.possible_moves(Stone::Black).len());
+  assert_eq!(81, game.possible_moves(stone::BLACK).len());
 }

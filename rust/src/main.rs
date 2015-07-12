@@ -51,7 +51,7 @@ fn benchmark_run(num_playouts: i32) -> time::Duration {
 fn play(game: &mut go::GoGame, rng: &mut rand::StdRng) -> (u32, i16) {
   // Use doubled score so we can score 0.5 komi in integer.
   let double_komi = 15;
-  let mut color_to_play = go::Stone::White;
+  let mut color_to_play = go::stone::WHITE;
   let mut num_consecutive_passes = 0;
   let mut num_moves = 0;
   game.reset();
