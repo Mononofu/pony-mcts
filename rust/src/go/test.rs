@@ -2,10 +2,43 @@ use super::GoGame;
 use super::Stone;
 use super::Vertex;
 use super::String;
+use super::NEIGHBOURS;
+use super::DIAG_NEIGHBOURS;
 
 extern crate rand;
 use rand::Rng;
 use rand::SeedableRng;
+
+#[test]
+fn stone_opponent() {
+  assert_eq!(Stone::White, Stone::Black.opponent());
+  assert_eq!(Stone::Black, Stone::White.opponent());
+}
+
+#[test]
+fn vertex_neighbours() {
+  for col in 0 .. 19 {
+    for row in 0 .. 19 {
+      let mut expected = vec![GoGame::vertex(col - 1, row),
+                              GoGame::vertex(col + 1, row),
+                              GoGame::vertex(col, row - 1),
+                              GoGame::vertex(col, row + 1)].clone();
+      expected.sort();
+      let mut got = NEIGHBOURS[GoGame::vertex(col, row).as_index()].clone();
+      got.sort();
+      assert_eq!(expected, got);
+
+      let mut expected = vec![GoGame::vertex(col - 1, row - 1),
+                              GoGame::vertex(col + 1, row - 1),
+                              GoGame::vertex(col - 1, row + 1),
+                              GoGame::vertex(col + 1, row + 1)].clone();
+      expected.sort();
+      let mut got = DIAG_NEIGHBOURS[GoGame::vertex(col, row).as_index()].clone();
+      got.sort();
+      assert_eq!(expected, got);
+    }
+  }
+}
 
 #[test]
 fn can_play_single_stone() {
@@ -13,6 +46,7 @@ fn can_play_single_stone() {
   let v = GoGame::vertex(2, 2);
   game.play(Stone::Black, v);
   assert_eq!(4, game.num_pseudo_liberties(v));
+  assert_eq!(false, game.can_play(Stone::Black, v));
 }
 
 #[test]
@@ -87,3 +121,18 @@ fn forbid_filling_real_eyes_of_split_group() {
   assert_eq!(false, game.can_play(Stone::Black, GoGame::vertex(1, 0)));
 }
 
+#[test]
+fn uniform_move_distribution() {
+  let mut rng = rand::StdRng::from_seed(&[42]);
+  let mut game = GoGame::new(9);
+  let num_valid_moves = game.possible_moves(Stone::Black).len() as f64;
+  let num_samples = 100000;
+  let mut count = vec![0; 21 * 21];
+  for i in 0 .. num_samples {
+    count[game.random_move(Stone::Black, &mut rng).as_index()] += 1;
+  }
+  for v in game.possible_moves(Stone::Black) {
+    let frac = count[v.as_index()] as f64 / num_samples as f64 * num_valid_moves;
+    assert!(frac > 0.9 && frac < 1.1, format!("{}", frac));
+  }
+}

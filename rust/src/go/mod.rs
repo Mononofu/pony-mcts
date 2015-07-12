@@ -3,8 +3,9 @@ extern crate rand;
 use rand::Rng;
 use std::fmt;
 use std::collections;
-use std::mem;
 
+// Enum struct with static lookup table for opponent is faster than a simple
+// with a match x {} based function.
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
 pub struct Stone(u8);
 
@@ -26,9 +27,9 @@ pub mod Stone {
 }
 
 mod constants;
-use self::constants::NEIGHBOURS;
-use self::constants::DIAG_NEIGHBOURS;
-use self::constants::Vertex;
+pub use self::constants::NEIGHBOURS;
+pub use self::constants::DIAG_NEIGHBOURS;
+pub use self::constants::Vertex;
 pub use self::constants::PASS;
 
 impl Vertex {
