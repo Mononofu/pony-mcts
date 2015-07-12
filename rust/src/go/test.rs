@@ -1,12 +1,10 @@
 use super::GoGame;
 use super::Stone;
-use super::Vertex;
-use super::String;
 use super::NEIGHBOURS;
 use super::DIAG_NEIGHBOURS;
+use super::VIRT_LEN;
 
 extern crate rand;
-use rand::Rng;
 use rand::SeedableRng;
 
 #[test]
@@ -127,8 +125,8 @@ fn uniform_move_distribution() {
   let mut game = GoGame::new(9);
   let num_valid_moves = game.possible_moves(Stone::Black).len() as f64;
   let num_samples = 100000;
-  let mut count = vec![0; 21 * 21];
-  for i in 0 .. num_samples {
+  let mut count = vec![0; VIRT_LEN];
+  for _ in 0 .. num_samples {
     count[game.random_move(Stone::Black, &mut rng).as_index()] += 1;
   }
   for v in game.possible_moves(Stone::Black) {

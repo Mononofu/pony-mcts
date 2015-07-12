@@ -32,9 +32,17 @@ pub use self::constants::DIAG_NEIGHBOURS;
 pub use self::constants::Vertex;
 pub use self::constants::PASS;
 
+// Maximum supported board size (width/height).
+const MAX_SIZE: u8 = 19;
+// Size of the virtual board necessary to support a board of MAX_SIZE.
+// This includes a one stone border on all sides of the board.
+const VIRT_SIZE: u8 = MAX_SIZE + 2;
+// Length of an array/vector necessary to store the virtual board.
+const VIRT_LEN: usize = VIRT_SIZE as usize * VIRT_SIZE as usize;
+
 impl Vertex {
   fn to_coords(self) -> (i16, i16) {
-    return ((self.0 % 21) - 1, self.0 / 21 - 1);
+    return ((self.0 % VIRT_SIZE as i16) - 1, self.0 / VIRT_SIZE as i16 - 1);
   }
 
   fn as_index(self) -> usize {
@@ -56,7 +64,8 @@ impl fmt::Debug for Vertex {
   }
 }
 
-
+// A string is a number of directly connected stones of the same color
+// (diagonal connections are not enough).
 #[derive(Clone)]
 struct String {
   color: Stone,
@@ -76,9 +85,14 @@ impl String {
     self.liberty_vertex_sum_squared = 0;
   }
 
+  // Special string value for the border of virtual stones surrounding the real
+  // board that is available for playing.
+  // This removes the need for bounds checking.
   fn reset_border(&mut self) {
     self.color = Stone::Empty;
     self.num_stones = 0;
+    // Need to have values big enough that they can never go below 0 even if
+    // all liberties are removed.
     self.num_pseudo_liberties = 4;
     self.liberty_vertex_sum = 32768;
     self.liberty_vertex_sum_squared = 2147483648;
@@ -111,8 +125,13 @@ impl String {
 
 pub struct GoGame {
   size: usize,
+  // Board of stones with a 1-stone border on all sides to remove the need for
+  // bound checking. Laid out as 1D vector, see GoGame::vertex for index
+  // calculation.
   board: Vec<Stone>,
 
+  // Zobrist hashing for tracking super-ko and debugging normal ko checking.
+  // Disabled in release mode for better performance.
   vertex_hashes: Vec<u64>,
   past_position_hashes: collections::HashSet<u64>,
   position_hash: u64,
@@ -130,20 +149,28 @@ pub struct GoGame {
   // removal and addition.
   empty_v_index: Vec<usize>,
 
+  // Number of black stones on the board, for scoring at the end of the game.
+  // White stones can be deduced from this, board size and empty_vertices.
   num_black_stones: i16,
 
+  // Vertex that can't be played on because it would be simple ko.
   ko_vertex: Vertex,
 }
 
 impl GoGame {
   pub fn new(size: usize) -> GoGame {
+    if size as u8 > MAX_SIZE {
+      panic!("{} is larger than maximum supported board size of {}",
+        size, MAX_SIZE);
+    }
+
     let mut rng = rand::thread_rng();
 
-    let mut board = vec![Stone::Border; 21 * 21];
+    let mut board = vec![Stone::Border; VIRT_LEN];
     let mut hash = 0;
     let mut vertex_hashes =  if cfg!(debug) { vec![0; 3 * board.len()] } else { vec![] };
     let mut empty_vertices = Vec::with_capacity(size * size);
-    let mut empty_v_index = vec![0; 21 * 21];
+    let mut empty_v_index = vec![0; VIRT_LEN];
     for col in 0 .. size {
       for row in 0 .. size {
         if cfg!(debug) {
@@ -163,8 +190,8 @@ impl GoGame {
     }
 
 
-    let mut string_head = vec![PASS; 21 * 21];
-    for i in 0 .. 21 * 21 {
+    let mut string_head = vec![PASS; VIRT_LEN];
+    for i in 0 .. VIRT_LEN {
       string_head[i] = Vertex(i as i16);
     }
 
@@ -175,7 +202,7 @@ impl GoGame {
       num_pseudo_liberties: 4,
       liberty_vertex_sum: 32768, // 2 ^ 15
       liberty_vertex_sum_squared: 2147483648, // 2 ^ 31
-    }; 21 * 21];
+    }; VIRT_LEN];
 
     let past_position_hashes = if cfg!(debug) {
       collections::HashSet::with_capacity(500)
@@ -192,7 +219,7 @@ impl GoGame {
 
       strings: strings,
       string_head: string_head,
-      string_next_v: vec![PASS; 21 * 21],
+      string_next_v: vec![PASS; VIRT_LEN],
 
       empty_vertices: empty_vertices,
       empty_v_index: empty_v_index,
@@ -203,13 +230,15 @@ impl GoGame {
     }
   }
 
+  // Resets the game and clears the board. Same result as creating a new
+  // instance, but this doesn't need to allocate any memory.
   pub fn reset(&mut self) {
     self.empty_vertices.clear();
     self.past_position_hashes.clear();
     self.num_black_stones = 0;
     self.ko_vertex = PASS;
 
-    for i in 0 .. 21 * 21 {
+    for i in 0 .. (VIRT_LEN) as usize {
       self.strings[i].reset_border();
       self.string_head[i] = Vertex(i as i16);
       self.string_next_v[i] = PASS;
@@ -235,16 +264,17 @@ impl GoGame {
   }
 
   pub fn vertex(x: i16, y: i16) -> Vertex {
-    Vertex(x + 1 + (y + 1) * 21)
+    Vertex(x + 1 + (y + 1) * VIRT_SIZE as i16)
   }
 
+  // Calculates zobrist hash for a vertex. Used for super-ko detection.
   fn hash_for(&self, vertex: Vertex) -> u64 {
     let offset = match self.stone_at(vertex) {
       Stone::Empty => 0,
       Stone::Black => 1,
       Stone::White => 2,
       Stone::Border => 3,
-      _ => 4,
+      _ => panic!("unknown stone"),
     };
     return self.vertex_hashes[offset * self.size * self.size + vertex.as_index()];
   }
@@ -286,6 +316,8 @@ impl GoGame {
     if cfg!(debug) && !self.can_play(stone, vertex) {
       return false;
     }
+
+    // Preparation for ko checking.
     let old_num_empty_vertices = self.empty_vertices.len();
     let mut played_in_enemy_eye = true;
     for n in NEIGHBOURS[vertex.as_index()].iter() {
@@ -354,6 +386,8 @@ impl GoGame {
     return self.string(vertex).num_pseudo_liberties;
   }
 
+  // Combines the groups around the newly placed stone at vertex. If no groups
+  // are available for joining, the new stone is placed as it's one new group.
   fn join_groups_around(&mut self, vertex: Vertex, stone: Stone) {
     let mut largest_group_head = PASS;
     let mut largest_group_size = 0;
