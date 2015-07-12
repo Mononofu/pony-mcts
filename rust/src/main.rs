@@ -6,31 +6,42 @@ mod go;
 
 #[allow(dead_code)]
 fn main() {
-  let num_trials = 11;
-  let num_rollouts = 10000;
-  let mut durations = (0..num_trials).map(|_| benchmark_run(num_rollouts)).collect::<Vec<_>>();
+  benchmark(run_rollouts, 10000, 11);
+}
+
+fn benchmark(f: fn(u64), n: u64, repetitions: u64) {
+  let mut durations = (0..repetitions).map(|_| {
+    let start = time::PreciseTime::now();
+    f(n);
+    let total = start.to(time::PreciseTime::now());
+    println!("{} playouts in {}, {:.2} kpps", n, total,
+      n as f64 / total.num_milliseconds() as f64);
+    total
+  }).collect::<Vec<_>>();
   durations.sort();
-  let mean = durations.iter().fold(time::Duration::zero(), |acc, &d| acc + d) / num_trials;
-  let median = durations[(num_trials / 2) as usize];
+
+  let mean = durations.iter().fold(time::Duration::zero(), |acc, &d| acc + d) / repetitions as i32;
+  let median = durations[(repetitions / 2) as usize];
   let min = durations[0];
-  let max = durations[(num_trials - 1) as usize];
+  let max = durations[(repetitions - 1) as usize];
+
   let mut stddev = 0.0;
   for d in durations {
     let diff = (d.num_nanoseconds().unwrap() - mean.num_nanoseconds().unwrap()) as f64;
     stddev += diff * diff;
   }
   let stddev_dur = time::Duration::nanoseconds(stddev.sqrt() as i64);
+
   println!("|{}---{}---{}|, mean {} +- {}", min, median, max, mean, stddev_dur);
 }
 
-fn benchmark_run(num_playouts: i32) -> time::Duration {
-  let start = time::PreciseTime::now();
+fn run_rollouts(num_rollouts: u64) {
   let mut rng = rand::StdRng::from_seed(&[42]);
   let mut num_moves = 0u64;
   let mut double_total_score = 0i64;
   let mut game = go::GoGame::new(19);
   let mut num_black_wins = 0u64;
-  for _ in 0 .. num_playouts {
+  for _ in 0 .. num_rollouts {
     let (n, s) = play(&mut game, &mut rng);
     num_moves += n as u64;
     double_total_score += s as i64;
@@ -38,14 +49,10 @@ fn benchmark_run(num_playouts: i32) -> time::Duration {
       num_black_wins += 1;
     }
   }
-  let total = start.to(time::PreciseTime::now());
-  println!("{} playouts in {}, {:.2} kpps", num_playouts, total,
-      num_playouts as f64 / total.num_milliseconds() as f64);
   println!("{} moves per playout, mean score {:.2}, winrate {:.2} %",
-      num_moves as f64 / num_playouts as f64,
-      double_total_score as f64 / num_playouts as f64 / 2f64,
-      100f64 * num_black_wins as f64 / num_playouts as f64);
-  return total;
+      num_moves as f64 / num_rollouts as f64,
+      double_total_score as f64 / num_rollouts as f64 / 2f64,
+      100f64 * num_black_wins as f64 / num_rollouts as f64);
 }
 
 fn play(game: &mut go::GoGame, rng: &mut rand::StdRng) -> (u32, i16) {
