@@ -6,6 +6,10 @@ v 0.1: full implementation of the Go rules, including ko detection. Supports com
 
 For comparison, [libego](https://github.com/lukaszlew/libego) does about 7.6 k playouts / second, or 0.13 ms per playout.
 
+- 2015-07-12: using a static lookup table for converting to opponent color brings a large speedup again! Now it's definitely faster than libego, only 0.085 ms per playout, or 11.7 k playouts / second.
+  
+  |PT0.855230796S---PT0.857407068S---PT0.876214215S|, mean PT0.859361824S +- PT0.018331746S
+
 - 2015-07-12: huge speedup by removing as much memory allocation as possible and using lookup tables for neighbour iteration:
 
   |PT1.126971459S---PT1.130741602S---PT1.155741012S|, mean PT1.134396429S +- PT0.026916247S

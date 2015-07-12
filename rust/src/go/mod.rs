@@ -6,20 +6,21 @@ use std::collections;
 use std::mem;
 
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
-pub enum Stone {
-  Empty,
-  Black,
-  White,
-  Border,
-}
+pub struct Stone(u8);
 
-impl Stone {
-  pub fn opponent(self) -> Stone {
-    match self {
-      Stone::Empty => Stone::Empty,
-      Stone::Black => Stone::White,
-      Stone::White => Stone::Black,
-      Stone::Border => Stone::Border,
+pub mod Stone {
+  use super::Stone;
+
+  pub const Empty: Stone = Stone(0);
+  pub const Black: Stone = Stone(1);
+  pub const White: Stone = Stone(2);
+  pub const Border: Stone = Stone(3);
+
+  pub static OPPONENT: [Stone; 4] = [Empty, White, Black, Border];
+
+  impl Stone {
+    pub fn opponent(self) -> Stone {
+      return OPPONENT[self.0 as usize];
     }
   }
 }
@@ -242,6 +243,7 @@ impl GoGame {
       Stone::Black => 1,
       Stone::White => 2,
       Stone::Border => 3,
+      _ => 4,
     };
     return self.vertex_hashes[offset * self.size * self.size + vertex.as_index()];
   }
