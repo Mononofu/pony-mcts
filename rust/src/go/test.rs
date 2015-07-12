@@ -3,6 +3,7 @@ use super::Stone;
 use super::NEIGHBOURS;
 use super::DIAG_NEIGHBOURS;
 use super::VIRT_LEN;
+use super::MAX_SIZE;
 
 extern crate rand;
 use rand::SeedableRng;
@@ -15,8 +16,8 @@ fn stone_opponent() {
 
 #[test]
 fn vertex_neighbours() {
-  for col in 0 .. 19 {
-    for row in 0 .. 19 {
+  for col in 0 .. MAX_SIZE as i16 {
+    for row in 0 .. MAX_SIZE as i16 {
       let mut expected = vec![GoGame::vertex(col - 1, row),
                               GoGame::vertex(col + 1, row),
                               GoGame::vertex(col, row - 1),
@@ -133,4 +134,26 @@ fn uniform_move_distribution() {
     let frac = count[v.as_index()] as f64 / num_samples as f64 * num_valid_moves;
     assert!(frac > 0.9 && frac < 1.1, format!("{}", frac));
   }
+}
+
+#[test]
+fn chinese_score_full_board() {
+  let mut game = GoGame::new(9);
+  for v in game.possible_moves(Stone::Black) {
+    game.play(Stone::Black, v);
+  }
+  assert_eq!(9*9, game.chinese_score());
+}
+
+#[test]
+fn chinese_score_also_count_eyes() {
+  let mut game = GoGame::new(9);
+  for col in 0 .. MAX_SIZE as i16 {
+    for row in 0 .. MAX_SIZE as i16 {
+      if col + row % 2 == 0 {
+        game.play(Stone::Black, GoGame::vertex(col, row));
+      }
+    }
+  }
+  assert_eq!(9*9, game.chinese_score());
 }
