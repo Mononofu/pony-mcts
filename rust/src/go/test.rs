@@ -157,3 +157,14 @@ fn chinese_score_also_count_eyes() {
   }
   assert_eq!(9*9, game.chinese_score());
 }
+
+
+#[test]
+fn reset_game() {
+  let mut game = GoGame::new(9);
+  assert_eq!(81, game.possible_moves(Stone::Black).len());
+  game.play(Stone::Black, GoGame::vertex(0, 0));
+  assert_eq!(80, game.possible_moves(Stone::Black).len());
+  game.reset();
+  assert_eq!(81, game.possible_moves(Stone::Black).len());
+}

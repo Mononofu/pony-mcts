@@ -4,6 +4,7 @@ extern crate time;
 
 mod go;
 
+#[allow(dead_code)]
 fn main() {
   let num_trials = 11;
   let num_rollouts = 10000;

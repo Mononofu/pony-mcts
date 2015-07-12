@@ -343,20 +343,6 @@ impl GoGame {
     return true;
   }
 
-  fn place_new_stone_as_string(&mut self, vertex: Vertex, stone: Stone) {
-    self.strings[vertex.as_index()].reset();
-    self.strings[vertex.as_index()].num_stones += 1;
-
-    for n in NEIGHBOURS[vertex.as_index()].iter() {
-      if self.stone_at(*n) == Stone::Empty {
-        self.strings[vertex.as_index()].add_liberty(*n);
-      }
-    }
-
-    self.string_head[vertex.as_index()] = vertex;
-    self.string_next_v[vertex.as_index()] = vertex;
-  }
-
   fn remove_liberty_from_neighbouring_groups(&mut self, vertex: Vertex) {
     for n in NEIGHBOURS[vertex.as_index()].iter() {
       self.strings[self.string_head[n.as_index()].as_index()].remove_liberty(vertex);
@@ -402,7 +388,7 @@ impl GoGame {
     }
 
     if largest_group_size == 0 {
-      self.place_new_stone_as_string(vertex, stone);
+      self.init_new_string(vertex);
       return;
     }
 
@@ -451,6 +437,19 @@ impl GoGame {
     }
   }
 
+  fn init_new_string(&mut self, vertex: Vertex) {
+    self.strings[vertex.as_index()].reset();
+    self.strings[vertex.as_index()].num_stones += 1;
+
+    for n in NEIGHBOURS[vertex.as_index()].iter() {
+      if self.stone_at(*n) == Stone::Empty {
+        self.strings[vertex.as_index()].add_liberty(*n);
+      }
+    }
+
+    self.string_head[vertex.as_index()] = vertex;
+    self.string_next_v[vertex.as_index()] = vertex;
+  }
 
   fn dead(&self, vertex: Vertex) -> bool {
     return self.string(vertex).num_pseudo_liberties == 0;
