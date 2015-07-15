@@ -1,12 +1,27 @@
 extern crate rand;
 use rand::SeedableRng;
 extern crate time;
+use std::io;
+use std::io::prelude::*;
 
 mod go;
+mod mcts;
+mod gtp;
 
 #[allow(dead_code)]
 fn main() {
-  benchmark(run_rollouts, 10000, 11);
+  // benchmark(run_rollouts, 1000, 1);
+  let mut rng = rand::StdRng::from_seed(&[42]);
+
+  let mut engine = gtp::Engine::new(rng);
+  let stdin = io::stdin();
+  for line in stdin.lock().lines() {
+    println!("{}", engine.execute(line.unwrap()));
+    println!("");
+    if !engine.running {
+      break;
+    }
+  }
 }
 
 fn benchmark(f: fn(u64), n: u64, repetitions: u64) {
@@ -63,7 +78,7 @@ fn play(game: &mut go::GoGame, rng: &mut rand::StdRng) -> (u32, i16) {
   let mut num_moves = 0;
   game.reset();
 
-  'outer: while num_consecutive_passes < 2 {
+  while num_consecutive_passes < 2 {
     color_to_play = color_to_play.opponent();
     num_moves += 1;
     let v = game.random_move(color_to_play, rng);

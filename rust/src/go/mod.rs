@@ -26,7 +26,19 @@ pub mod stone {
   }
 }
 
-mod constants;
+impl fmt::Display for Stone {
+  fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+    return write!(f, "{}", match self.0 {
+      0 => "empty",
+      1 => "black",
+      2 => "white",
+      3 => "border",
+      _ => panic!(),
+    });
+  }
+}
+
+pub mod constants;
 pub use self::constants::NEIGHBOURS;
 pub use self::constants::DIAG_NEIGHBOURS;
 pub use self::constants::Vertex;
@@ -52,6 +64,9 @@ impl Vertex {
 
 impl fmt::Display for Vertex {
   fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+    if *self == PASS {
+      return write!(f, "PASS");
+    }
     let (x, y) = self.to_coords();
     let column_labels = "aABCDEFGHIKLMNOPORSTUu";
     try!(write!(f, "{}", column_labels.chars().nth((x + 1) as usize).unwrap()));
@@ -123,6 +138,7 @@ impl String {
   }
 }
 
+#[derive(Clone)]
 pub struct GoGame {
   size: usize,
   // Board of stones with a 1-stone border on all sides to remove the need for
@@ -313,6 +329,10 @@ impl GoGame {
   }
 
   pub fn play(&mut self, stone: Stone, vertex: Vertex) -> bool {
+    if vertex == PASS {
+      return true;
+    }
+
     if cfg!(debug) && !self.can_play(stone, vertex) {
       return false;
     }

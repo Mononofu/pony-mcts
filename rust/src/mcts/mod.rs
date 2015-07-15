@@ -1,0 +1,114 @@
+extern crate rand;
+
+use go::constants::Vertex;
+use go::constants::PASS;
+use go::GoGame;
+use go::Stone;
+use go::stone;
+
+const EXPANSION_THRESHOLD: u32 = 4;
+const UCT_C: f64 = 1.4;
+
+pub struct Node {
+  player: Stone,
+  pub vertex: Vertex,
+  pub children: Vec<Node>,
+
+  num_plays: u32,
+  num_wins: i32,
+}
+
+pub struct Controller {
+  pub root: Node,
+}
+
+fn black_wins(game: &mut GoGame, last_move: Stone, rng: &mut rand::StdRng) -> bool {
+  let double_komi = 15;
+  let mut color_to_play = last_move;
+  let mut num_consecutive_passes = 0;
+
+  while num_consecutive_passes < 2 {
+    color_to_play = color_to_play.opponent();
+    let v = game.random_move(color_to_play, rng);
+    if v == PASS {
+      num_consecutive_passes += 1;
+    } else {
+      game.play(color_to_play, v);
+      num_consecutive_passes = 0;
+    }
+  }
+  return game.chinese_score() * 2 - double_komi > 0;
+}
+
+impl Controller {
+  pub fn new() -> Controller {
+    Controller {
+      root: Node::new(stone::WHITE, PASS),
+    }
+  }
+
+  pub fn gen_move(&mut self, game: &GoGame, num_rollouts: u32, rng: &mut rand::StdRng) -> Vertex {
+    for i in 1 .. num_rollouts + 1 {
+      // TODO: Don't clone here.
+      self.root.run_rollout(i, &mut game.clone(), rng);
+    }
+    self.root.best_child(num_rollouts, 0f64).vertex
+  }
+}
+
+impl Node {
+  fn new(player: Stone, vertex: Vertex) -> Node {
+    Node {
+      player: player,
+      vertex: vertex,
+      children: vec![],
+
+      num_plays: 2,
+      num_wins: 1,
+    }
+  }
+
+  // Returns whether black wins to update the win rate in parent nodes.
+  fn run_rollout(&mut self, num_sims: u32, game: &mut GoGame, rng: &mut rand::StdRng) -> bool {
+    game.play(self.player, self.vertex);
+    self.num_plays += 1;
+
+    let black_wins = if self.children.is_empty() {
+      if self.num_plays > EXPANSION_THRESHOLD {
+        let opponent = self.player.opponent();
+        for v in game.possible_moves(opponent) {
+          self.children.push(Node::new(opponent, v));
+        }
+      }
+
+      black_wins(game, self.player, rng)
+    } else {
+      self.best_child(num_sims, UCT_C).run_rollout(num_sims, game, rng)
+    };
+
+    if black_wins && self.player == stone::BLACK {
+      self.num_wins += 1;
+    } else if !black_wins && self.player == stone::WHITE {
+      self.num_wins += 1;
+    }
+    return black_wins;
+  }
+
+  fn best_child(&mut self, num_sims: u32, uct_constant: f64) -> &mut Node {
+    let mut best_value = -1f64;
+    let mut best_child = 0;
+    for i in 0 .. self.children.len() {
+      let value = self.children[i].uct(num_sims, uct_constant);
+      if value > best_value {
+        best_value = value;
+        best_child = i;
+      }
+    }
+    &mut self.children[best_child]
+  }
+
+  pub fn uct(&self, num_sims: u32, uct_constant: f64) -> f64 {
+    self.num_wins as f64 / self.num_plays as f64 +
+        uct_constant * ((num_sims as f64).ln() / self.num_plays as f64).sqrt()
+  }
+}
