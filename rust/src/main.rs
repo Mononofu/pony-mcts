@@ -10,7 +10,7 @@ mod gtp;
 
 #[allow(dead_code)]
 fn main() {
-  let mut rng = rand::StdRng::from_seed(&[42]);
+  let mut rng = rand::StdRng::from_seed(&[time::precise_time_ns() as usize]);
 
   let mut engine = gtp::Engine::new(rng);
   let stdin = io::stdin();

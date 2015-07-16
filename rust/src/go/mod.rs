@@ -82,7 +82,7 @@ impl fmt::Display for Vertex {
       return write!(f, "PASS");
     }
     let (x, y) = self.to_coords();
-    let column_labels = "aABCDEFGHIKLMNOPQRSTUu";
+    let column_labels = "aABCDEFGHJKLMNOPQRSTu";
     try!(write!(f, "{}", column_labels.chars().nth((x + 1) as usize).unwrap()));
     return write!(f, "{}", y + 1);
   }
@@ -97,14 +97,18 @@ impl str::FromStr for Vertex {
   type Err = string::String;
 
   fn from_str(s: &str) -> Result<Vertex, string::String> {
+    if s == "PASS" || s == "pass" {
+      return Ok(PASS);
+    }
+
     if s.len() < 2 || s.len() > 3 {
       return Err("expected Vertex of format A1".to_string());
     }
-    let column_labels = "ABCDEFGHIKLMNOPQRSTU";
+    let column_labels = "ABCDEFGHJKLMNOPQRST";
     let col_char = s.chars().next().unwrap();
     let col = match column_labels.find(|c| c == col_char) {
       Some(i) => i,
-      None => return Err("column must be A - U".to_string()),
+      None => return Err("column must be A - T".to_string()),
     };
     let row = (s[1..]).parse::<i16>();
     if row.is_err() {
@@ -209,6 +213,7 @@ pub struct GoGame {
   ko_vertex: Vertex,
 
   pub to_play: Stone,
+  pub history: Vec<Vertex>,
 }
 
 impl GoGame {
@@ -283,6 +288,7 @@ impl GoGame {
       ko_vertex: PASS,
 
       to_play: stone::BLACK,
+      history: Vec::with_capacity(500),
     }
   }
 
@@ -293,6 +299,8 @@ impl GoGame {
     self.past_position_hashes.clear();
     self.num_black_stones = 0;
     self.ko_vertex = PASS;
+    self.to_play = stone::BLACK;
+    self.history.clear();
 
     for i in 0 .. (VIRT_LEN) as usize {
       self.strings[i].reset_border();
@@ -398,6 +406,7 @@ impl GoGame {
     }
 
     self.to_play = stone.opponent();
+    self.history.push(vertex);
 
     if cfg!(debug) {
       self.check_ko();
@@ -632,7 +641,7 @@ impl GoGame {
     }
   }
 
-  pub fn possible_moves(&mut self, stone: Stone) -> Vec<Vertex> {
+  pub fn possible_moves(&self, stone: Stone) -> Vec<Vertex> {
     return self.empty_vertices.iter().map(|v| v.clone())
       .filter(|v| self.can_play(stone, *v)).collect::<Vec<_>>();
   }
@@ -670,7 +679,7 @@ impl GoGame {
 
 impl fmt::Display for GoGame {
   fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-    let column_labels = "ABCDEFGHIKLMNOPORSTU";
+    let column_labels = "ABCDEFGHIJKLMNOPORST";
     try!(write!(f, "\x1b[0;37m    "));
     for col in 0 .. self.size {
       try!(write!(f, " {}", column_labels.chars().nth(col).unwrap()));
@@ -692,6 +701,42 @@ impl fmt::Display for GoGame {
     try!(write!(f, "    "));
     for col in 0 .. self.size {
       try!(write!(f, " {}", column_labels.chars().nth(col).unwrap()));
+    }
+
+    return write!(f, "");
+  }
+}
+
+
+impl fmt::Debug for GoGame {
+  fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+    let column_labels = "ABCDEFGHJKLMNOPORST";
+    try!(write!(f, "    "));
+    for col in 0 .. self.size {
+      try!(write!(f, "{}", column_labels.chars().nth(col).unwrap()));
+    }
+    try!(write!(f, "\n"));
+
+    let mut row = self.size - 1;
+    loop {
+      try!(write!(f, " {:2} ", row + 1));
+      for col in 0 .. self.size {
+        try!(match self.stone_at(GoGame::vertex(col as i16, row as i16)) {
+          stone::BLACK => write!(f, "#"),
+          stone::WHITE => write!(f, "O"),
+          _ => write!(f, " ")
+        });
+      }
+      try!(write!(f, " {:2}\n", row + 1));
+      if row == 0 {
+        break;
+      }
+      row -= 1;
+    }
+
+    try!(write!(f, "    "));
+    for col in 0 .. self.size {
+      try!(write!(f, "{}", column_labels.chars().nth(col).unwrap()));
     }
 
     return write!(f, "");

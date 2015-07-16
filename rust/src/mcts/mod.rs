@@ -5,6 +5,8 @@ use go::constants::PASS;
 use go::GoGame;
 use go::Stone;
 use go::stone;
+use std;
+use std::io::Write;
 
 const EXPANSION_THRESHOLD: u32 = 4;
 const UCT_C: f64 = 1.4;
@@ -26,15 +28,21 @@ fn black_wins(game: &mut GoGame, last_move: Stone, rng: &mut rand::StdRng) -> bo
   let double_komi = 15;
   let mut color_to_play = last_move;
   let mut num_consecutive_passes = 0;
+  let mut num_moves = 0;
 
   while num_consecutive_passes < 2 {
     color_to_play = color_to_play.opponent();
+    num_moves += 1;
     let v = game.random_move(color_to_play, rng);
     if v == PASS {
       num_consecutive_passes += 1;
     } else {
       game.play(color_to_play, v);
       num_consecutive_passes = 0;
+    }
+    if num_moves > 700 {
+      writeln!(&mut std::io::stderr(), "too many moves!").unwrap();
+      return false;
     }
   }
   return game.chinese_score() * 2 - double_komi > 0;
@@ -48,14 +56,19 @@ impl Controller {
   }
 
   pub fn gen_move(&mut self, game: &GoGame, num_rollouts: u32, rng: &mut rand::StdRng) -> Vertex {
-    if game.clone().possible_moves(game.to_play).is_empty() {
+    let mut rollout_game = game.clone();
+    if rollout_game.possible_moves(game.to_play).is_empty() {
       return PASS;
     }
 
     self.root = Node::new(game.to_play.opponent(), PASS);
     for i in 1 .. num_rollouts + 1 {
-      // TODO: Don't clone here.
-      self.root.run_rollout(i, &mut game.clone(), rng);
+      rollout_game.reset();
+      for v in game.history.iter() {
+        let to_play = rollout_game.to_play;
+        rollout_game.play(to_play, *v);
+      }
+      self.root.run_rollout(i, &mut rollout_game, rng);
     }
     self.root.best_child(num_rollouts, 0f64).vertex
   }
