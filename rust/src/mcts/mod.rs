@@ -48,6 +48,11 @@ impl Controller {
   }
 
   pub fn gen_move(&mut self, game: &GoGame, num_rollouts: u32, rng: &mut rand::StdRng) -> Vertex {
+    if game.clone().possible_moves(game.to_play).is_empty() {
+      return PASS;
+    }
+
+    self.root = Node::new(game.to_play.opponent(), PASS);
     for i in 1 .. num_rollouts + 1 {
       // TODO: Don't clone here.
       self.root.run_rollout(i, &mut game.clone(), rng);

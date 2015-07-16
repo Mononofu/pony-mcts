@@ -10,7 +10,6 @@ mod gtp;
 
 #[allow(dead_code)]
 fn main() {
-  // benchmark(run_rollouts, 1000, 1);
   let mut rng = rand::StdRng::from_seed(&[42]);
 
   let mut engine = gtp::Engine::new(rng);
@@ -19,9 +18,11 @@ fn main() {
     println!("{}", engine.execute(line.unwrap()));
     println!("");
     if !engine.running {
-      break;
+      return;
     }
   }
+
+  benchmark(run_rollouts, 1000, 1);
 }
 
 fn benchmark(f: fn(u64), n: u64, repetitions: u64) {

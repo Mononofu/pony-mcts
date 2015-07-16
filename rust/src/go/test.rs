@@ -4,6 +4,7 @@ use super::NEIGHBOURS;
 use super::DIAG_NEIGHBOURS;
 use super::VIRT_LEN;
 use super::MAX_SIZE;
+use super::Vertex;
 
 extern crate rand;
 use rand::SeedableRng;
@@ -167,4 +168,14 @@ fn reset_game() {
   assert_eq!(80, game.possible_moves(stone::BLACK).len());
   game.reset();
   assert_eq!(81, game.possible_moves(stone::BLACK).len());
+}
+
+#[test]
+fn parse_vertex() {
+  for col in 0 .. MAX_SIZE as i16 {
+    for row in 0 .. MAX_SIZE as i16 {
+      assert_eq!(GoGame::vertex(col, row),
+        format!("{}", GoGame::vertex(col, row)).parse::<Vertex>().unwrap());
+    }
+  }
 }

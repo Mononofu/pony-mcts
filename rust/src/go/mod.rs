@@ -3,6 +3,8 @@ extern crate rand;
 use rand::Rng;
 use std::fmt;
 use std::collections;
+use std::str;
+use std::string;
 
 // Enum struct with static lookup table for opponent is faster than a simple
 // with a match x {} based function.
@@ -38,6 +40,18 @@ impl fmt::Display for Stone {
   }
 }
 
+impl str::FromStr for Stone {
+  type Err = string::String;
+
+  fn from_str(s: &str) -> Result<Stone, string::String> {
+    match s {
+      "w" | "white" | "W" | "WHITE" => Ok(stone::WHITE),
+      "b" | "black" | "B" | "BLACK" => Ok(stone::BLACK),
+      _ => Err(format!("unknown color '{}'", s)),
+    }
+  }
+}
+
 pub mod constants;
 pub use self::constants::NEIGHBOURS;
 pub use self::constants::DIAG_NEIGHBOURS;
@@ -68,7 +82,7 @@ impl fmt::Display for Vertex {
       return write!(f, "PASS");
     }
     let (x, y) = self.to_coords();
-    let column_labels = "aABCDEFGHIKLMNOPORSTUu";
+    let column_labels = "aABCDEFGHIKLMNOPQRSTUu";
     try!(write!(f, "{}", column_labels.chars().nth((x + 1) as usize).unwrap()));
     return write!(f, "{}", y + 1);
   }
@@ -76,6 +90,28 @@ impl fmt::Display for Vertex {
 impl fmt::Debug for Vertex {
   fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
     return write!(f, "{}", self);
+  }
+}
+
+impl str::FromStr for Vertex {
+  type Err = string::String;
+
+  fn from_str(s: &str) -> Result<Vertex, string::String> {
+    if s.len() < 2 || s.len() > 3 {
+      return Err("expected Vertex of format A1".to_string());
+    }
+    let column_labels = "ABCDEFGHIKLMNOPQRSTU";
+    let col_char = s.chars().next().unwrap();
+    let col = match column_labels.find(|c| c == col_char) {
+      Some(i) => i,
+      None => return Err("column must be A - U".to_string()),
+    };
+    let row = (s[1..]).parse::<i16>();
+    if row.is_err() {
+      return Err("row must be integer".to_string());
+    }
+
+    Ok(GoGame::vertex(col as i16, row.unwrap() - 1))
   }
 }
 
@@ -171,6 +207,8 @@ pub struct GoGame {
 
   // Vertex that can't be played on because it would be simple ko.
   ko_vertex: Vertex,
+
+  pub to_play: Stone,
 }
 
 impl GoGame {
@@ -243,6 +281,8 @@ impl GoGame {
       num_black_stones: 0,
 
       ko_vertex: PASS,
+
+      to_play: stone::BLACK,
     }
   }
 
@@ -356,6 +396,8 @@ impl GoGame {
     if played_in_enemy_eye && old_num_empty_vertices == self.empty_vertices.len() {
       self.ko_vertex = *self.empty_vertices.last().unwrap();
     }
+
+    self.to_play = stone.opponent();
 
     if cfg!(debug) {
       self.check_ko();
