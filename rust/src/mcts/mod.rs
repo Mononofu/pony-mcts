@@ -24,7 +24,7 @@ pub struct Controller {
 }
 
 fn black_wins(game: &mut GoGame, last_move: Stone, rng: &mut rand::StdRng) -> bool {
-  let double_komi = 15;
+  let double_komi = 13;
   let mut color_to_play = last_move;
   let mut num_consecutive_passes = 0;
   let mut num_moves = 0;

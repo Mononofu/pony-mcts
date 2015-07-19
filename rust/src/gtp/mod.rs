@@ -79,10 +79,12 @@ impl Engine {
     let start = time::PreciseTime::now();
     let color = try!(args[1].parse::<Stone>());
     self.game.to_play = color;
-    let v = self.controller.gen_move(&self.game, 5000, &mut self.rng);
-    info!("can_play({}, {}) = {}", color, v, self.game.can_play(color, v));
+    let num_simulations = 50000;
+    let v = self.controller.gen_move(&self.game, num_simulations, &mut self.rng);
     self.game.play(color, v);
-    info!("generate move in {}\n{:?}", start.to(time::PreciseTime::now()), self.game);
+    let duration = start.to(time::PreciseTime::now());
+    info!("generate move in {} ({:.2} kpps)\n{:?}", duration,
+      num_simulations as f64 / duration.num_milliseconds() as f64, self.game);
     Ok(format!("{}", v))
   }
 
