@@ -6,6 +6,7 @@ authors = [ "Julian Schrittwieser <mcts@furidamu.org>" ]
 
 [dependencies]
 
+log="*"
 rand="*"
 time="*"
 

@@ -5,6 +5,7 @@ use super::DIAG_NEIGHBOURS;
 use super::VIRT_LEN;
 use super::MAX_SIZE;
 use super::Vertex;
+use super::PASS;
 
 extern crate rand;
 use rand::SeedableRng;
@@ -178,4 +179,5 @@ fn parse_vertex() {
         format!("{}", GoGame::vertex(col, row)).parse::<Vertex>().unwrap());
     }
   }
+  assert_eq!(PASS, format!("{}", PASS).parse::<Vertex>().unwrap());
 }

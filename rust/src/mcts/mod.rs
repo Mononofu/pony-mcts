@@ -1,3 +1,4 @@
+extern crate log;
 extern crate rand;
 
 use go::constants::Vertex;
@@ -5,8 +6,6 @@ use go::constants::PASS;
 use go::GoGame;
 use go::Stone;
 use go::stone;
-use std;
-use std::io::Write;
 
 const EXPANSION_THRESHOLD: u32 = 4;
 const UCT_C: f64 = 1.4;
@@ -41,7 +40,7 @@ fn black_wins(game: &mut GoGame, last_move: Stone, rng: &mut rand::StdRng) -> bo
       num_consecutive_passes = 0;
     }
     if num_moves > 700 {
-      writeln!(&mut std::io::stderr(), "too many moves!").unwrap();
+      warn!("too many moves!");
       return false;
     }
   }
@@ -69,6 +68,9 @@ impl Controller {
         rollout_game.play(to_play, *v);
       }
       self.root.run_rollout(i, &mut rollout_game, rng);
+    }
+    if self.root.children.is_empty() {
+      return PASS;
     }
     self.root.best_child(num_rollouts, 0f64).vertex
   }

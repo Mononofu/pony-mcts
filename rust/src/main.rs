@@ -1,3 +1,5 @@
+#[macro_use]
+extern crate log;
 extern crate rand;
 use rand::SeedableRng;
 extern crate time;
@@ -8,9 +10,33 @@ mod go;
 mod mcts;
 mod gtp;
 
+use log::{LogRecord, LogLevel, LogLevelFilter, LogMetadata};
+
+struct SimpleLogger;
+
+impl log::Log for SimpleLogger {
+    fn enabled(&self, metadata: &LogMetadata) -> bool {
+        metadata.level() <= LogLevel::Info
+    }
+
+    fn log(&self, record: &LogRecord) {
+        if self.enabled(record.metadata()) {
+            writeln!(&mut std::io::stderr(), "{} {}:{} - {}", record.level(),
+              record.location().file(), record.location().line(),
+              record.args());
+        }
+    }
+}
+
 #[allow(dead_code)]
 fn main() {
-  let mut rng = rand::StdRng::from_seed(&[time::precise_time_ns() as usize]);
+  log::set_logger(|max_log_level| {
+        max_log_level.set(LogLevelFilter::Info);
+        Box::new(SimpleLogger)
+    }).unwrap();
+
+  // let mut rng = rand::StdRng::from_seed(&[time::precise_time_ns() as usize]);
+  let rng = rand::StdRng::from_seed(&[42]);
 
   let mut engine = gtp::Engine::new(rng);
   let stdin = io::stdin();

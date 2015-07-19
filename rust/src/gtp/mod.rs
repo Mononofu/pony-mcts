@@ -7,8 +7,6 @@ use go::stone;
 use go::Stone;
 use go::constants::PASS;
 use go::Vertex;
-use std;
-use std::io::Write;
 extern crate time;
 
 pub struct Engine {
@@ -70,7 +68,7 @@ impl Engine {
       return Err("expected: play C V".to_string());
     }
     self.game.play(try!(args[1].parse::<Stone>()), try!(args[2].parse::<Vertex>()));
-    writeln!(&mut std::io::stderr(), "{:?}", self.game).unwrap();
+    info!("new board:\n{:?}", self.game);
     Ok("".to_string())
   }
 
@@ -81,10 +79,10 @@ impl Engine {
     let start = time::PreciseTime::now();
     let color = try!(args[1].parse::<Stone>());
     self.game.to_play = color;
-    let v = self.controller.gen_move(&self.game, 50000, &mut self.rng);
+    let v = self.controller.gen_move(&self.game, 5000, &mut self.rng);
+    info!("can_play({}, {}) = {}", color, v, self.game.can_play(color, v));
     self.game.play(color, v);
-    writeln!(&mut std::io::stderr(), "generate move in {}\n{:?}",
-      start.to(time::PreciseTime::now()), self.game).unwrap();
+    info!("generate move in {}\n{:?}", start.to(time::PreciseTime::now()), self.game);
     Ok(format!("{}", v))
   }
 

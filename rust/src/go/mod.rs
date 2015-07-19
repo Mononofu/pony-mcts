@@ -377,40 +377,40 @@ impl GoGame {
   }
 
   pub fn play(&mut self, stone: Stone, vertex: Vertex) -> bool {
-    if vertex == PASS {
-      return true;
-    }
-
     if cfg!(debug) && !self.can_play(stone, vertex) {
       return false;
     }
 
-    // Preparation for ko checking.
-    let old_num_empty_vertices = self.empty_vertices.len();
-    let mut played_in_enemy_eye = true;
-    for n in NEIGHBOURS[vertex.as_index()].iter() {
-      let s = self.stone_at(*n);
-      if s == stone || s == stone::EMPTY {
-        played_in_enemy_eye = false;
+
+    if vertex != PASS {
+      // Preparation for ko checking.
+      let old_num_empty_vertices = self.empty_vertices.len();
+      let mut played_in_enemy_eye = true;
+      for n in NEIGHBOURS[vertex.as_index()].iter() {
+        let s = self.stone_at(*n);
+        if s == stone || s == stone::EMPTY {
+          played_in_enemy_eye = false;
+        }
       }
-    }
-    self.ko_vertex = PASS;
+      self.ko_vertex = PASS;
 
-    self.join_groups_around(vertex, stone);
-    self.set_stone(stone, vertex);
-    self.remove_liberty_from_neighbouring_groups(vertex);
-    self.capture_dead_groups(vertex, stone);
+      self.join_groups_around(vertex, stone);
+      self.set_stone(stone, vertex);
+      self.remove_liberty_from_neighbouring_groups(vertex);
+      self.capture_dead_groups(vertex, stone);
 
-    if played_in_enemy_eye && old_num_empty_vertices == self.empty_vertices.len() {
-      self.ko_vertex = *self.empty_vertices.last().unwrap();
+      if played_in_enemy_eye && old_num_empty_vertices == self.empty_vertices.len() {
+        self.ko_vertex = *self.empty_vertices.last().unwrap();
+      }
+
+      if cfg!(debug) {
+        self.check_ko();
+      }
     }
 
     self.to_play = stone.opponent();
     self.history.push(vertex);
 
-    if cfg!(debug) {
-      self.check_ko();
-    }
     return true;
   }
 
@@ -558,6 +558,10 @@ impl GoGame {
   }
 
   pub fn can_play(&self, stone: Stone, vertex: Vertex) -> bool {
+    if vertex == PASS {
+      return true;
+    }
+
     // Can't play if the vertex is not empty or would be ko.
     if self.stone_at(vertex) != stone::EMPTY || vertex == self.ko_vertex {
       return false;
