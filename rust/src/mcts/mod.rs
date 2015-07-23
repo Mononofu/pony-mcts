@@ -1,8 +1,8 @@
 extern crate log;
 extern crate rand;
 
-use go::constants::Vertex;
-use go::constants::PASS;
+use go::Vertex;
+use go::PASS;
 use go::GoGame;
 use go::Stone;
 use go::stone;

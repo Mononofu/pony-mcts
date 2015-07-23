@@ -1,7 +1,4 @@
-#[derive(Eq, Hash, PartialEq, Copy, Clone, Ord, PartialOrd)]
-pub struct Vertex(pub i16);
-
-pub const PASS: Vertex = Vertex(-1);
+use super::vertex::Vertex;
 
 // print',\n'.join(["[Vertex(%d - 1), Vertex(%d + 1), Vertex(%d - 21), Vertex(%d + 21)]" % (i, i, i, i) for i in range(21 * 21)])
 pub static NEIGHBOURS: [[Vertex; 4]; 21 * 21] = [

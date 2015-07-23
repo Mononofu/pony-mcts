@@ -3,17 +3,17 @@ extern crate rand;
 use rand::Rng;
 use std::fmt;
 use std::collections;
-use std::str;
-use std::string;
 
 pub mod stone;
 pub use self::stone::Stone;
 
+pub mod vertex;
+pub use self::vertex::Vertex;
+pub use self::vertex::PASS;
+
 pub mod constants;
 pub use self::constants::NEIGHBOURS;
 pub use self::constants::DIAG_NEIGHBOURS;
-pub use self::constants::Vertex;
-pub use self::constants::PASS;
 
 // Maximum supported board size (width/height).
 const MAX_SIZE: u8 = 19;
@@ -22,59 +22,6 @@ const MAX_SIZE: u8 = 19;
 const VIRT_SIZE: u8 = MAX_SIZE + 2;
 // Length of an array/vector necessary to store the virtual board.
 const VIRT_LEN: usize = VIRT_SIZE as usize * VIRT_SIZE as usize;
-
-impl Vertex {
-  fn to_coords(self) -> (i16, i16) {
-    return ((self.0 % VIRT_SIZE as i16) - 1, self.0 / VIRT_SIZE as i16 - 1);
-  }
-
-  fn as_index(self) -> usize {
-    return self.0 as usize;
-  }
-}
-
-impl fmt::Display for Vertex {
-  fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-    if *self == PASS {
-      return write!(f, "PASS");
-    }
-    let (x, y) = self.to_coords();
-    let column_labels = "aABCDEFGHJKLMNOPQRSTu";
-    try!(write!(f, "{}", column_labels.chars().nth((x + 1) as usize).unwrap()));
-    return write!(f, "{}", y + 1);
-  }
-}
-impl fmt::Debug for Vertex {
-  fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-    return write!(f, "{}", self);
-  }
-}
-
-impl str::FromStr for Vertex {
-  type Err = string::String;
-
-  fn from_str(s: &str) -> Result<Vertex, string::String> {
-    if s == "PASS" || s == "pass" {
-      return Ok(PASS);
-    }
-
-    if s.len() < 2 || s.len() > 3 {
-      return Err("expected Vertex of format A1".to_string());
-    }
-    let column_labels = "ABCDEFGHJKLMNOPQRST";
-    let col_char = s.chars().next().unwrap();
-    let col = match column_labels.find(|c| c == col_char) {
-      Some(i) => i,
-      None => return Err("column must be A - T".to_string()),
-    };
-    let row = (s[1..]).parse::<i16>();
-    if row.is_err() {
-      return Err("row must be integer".to_string());
-    }
-
-    Ok(GoGame::vertex(col as i16, row.unwrap() - 1))
-  }
-}
 
 // A string is a number of directly connected stones of the same color
 // (diagonal connections are not enough).
@@ -285,7 +232,7 @@ impl GoGame {
   }
 
   pub fn vertex(x: i16, y: i16) -> Vertex {
-    Vertex(x + 1 + (y + 1) * VIRT_SIZE as i16)
+    Vertex::new(x, y)
   }
 
   // Calculates zobrist hash for a vertex. Used for super-ko detection.

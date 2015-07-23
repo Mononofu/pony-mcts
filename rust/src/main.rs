@@ -23,7 +23,7 @@ impl log::Log for SimpleLogger {
         if self.enabled(record.metadata()) {
             writeln!(&mut std::io::stderr(), "{} {}:{} - {}", record.level(),
               record.location().file(), record.location().line(),
-              record.args());
+              record.args()).unwrap();
         }
     }
 }
@@ -38,6 +38,8 @@ fn main() {
   // let mut rng = rand::StdRng::from_seed(&[time::precise_time_ns() as usize]);
   let rng = rand::StdRng::from_seed(&[42]);
 
+  benchmark(run_rollouts, 10000, 3);
+
   let mut engine = gtp::Engine::new(rng);
   let stdin = io::stdin();
   for line in stdin.lock().lines() {
@@ -47,8 +49,6 @@ fn main() {
       return;
     }
   }
-
-  benchmark(run_rollouts, 1000, 1);
 }
 
 fn benchmark(f: fn(u64), n: u64, repetitions: u64) {

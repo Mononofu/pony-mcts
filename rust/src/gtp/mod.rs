@@ -3,9 +3,7 @@ extern crate rand;
 use go::GoGame;
 use mcts::Controller;
 use std::collections;
-use go::stone;
 use go::Stone;
-use go::constants::PASS;
 use go::Vertex;
 extern crate time;
 
