@@ -15,6 +15,9 @@ pub mod constants;
 pub use self::constants::NEIGHBOURS;
 pub use self::constants::DIAG_NEIGHBOURS;
 
+pub mod string;
+pub use self::string::String;
+
 // Maximum supported board size (width/height).
 const MAX_SIZE: u8 = 19;
 // Size of the virtual board necessary to support a board of MAX_SIZE.
@@ -23,64 +26,6 @@ const VIRT_SIZE: u8 = MAX_SIZE + 2;
 // Length of an array/vector necessary to store the virtual board.
 const VIRT_LEN: usize = VIRT_SIZE as usize * VIRT_SIZE as usize;
 
-// A string is a number of directly connected stones of the same color
-// (diagonal connections are not enough).
-#[derive(Clone)]
-struct String {
-  color: Stone,
-  num_stones: u16,
-
-  num_pseudo_liberties: u8,
-  liberty_vertex_sum: u16,
-  liberty_vertex_sum_squared: u32,
-}
-
-impl String {
-  fn reset(&mut self) {
-    self.color = stone::EMPTY;
-    self.num_stones = 0;
-    self.num_pseudo_liberties = 0;
-    self.liberty_vertex_sum = 0;
-    self.liberty_vertex_sum_squared = 0;
-  }
-
-  // Special string value for the border of virtual stones surrounding the real
-  // board that is available for playing.
-  // This removes the need for bounds checking.
-  fn reset_border(&mut self) {
-    self.color = stone::EMPTY;
-    self.num_stones = 0;
-    // Need to have values big enough that they can never go below 0 even if
-    // all liberties are removed.
-    self.num_pseudo_liberties = 4;
-    self.liberty_vertex_sum = 32768;
-    self.liberty_vertex_sum_squared = 2147483648;
-  }
-
-  fn merge(&mut self, other: &String) {
-    self.num_stones += other.num_stones;
-    self.num_pseudo_liberties += other.num_pseudo_liberties;
-    self.liberty_vertex_sum += other.liberty_vertex_sum;
-    self.liberty_vertex_sum_squared += other.liberty_vertex_sum_squared;
-  }
-
-  fn in_atari(&self) -> bool {
-    return self.num_pseudo_liberties as u32 * self.liberty_vertex_sum_squared  ==
-      self.liberty_vertex_sum as u32 * self.liberty_vertex_sum as u32;
-  }
-
-  fn add_liberty(&mut self, vertex: Vertex) {
-    self.num_pseudo_liberties += 1;
-    self.liberty_vertex_sum += vertex.0 as u16;
-    self.liberty_vertex_sum_squared += vertex.0 as u32 * vertex.0 as u32;
-  }
-
-  fn remove_liberty(&mut self, vertex: Vertex) {
-    self.num_pseudo_liberties -= 1;
-    self.liberty_vertex_sum -= vertex.0 as u16;
-    self.liberty_vertex_sum_squared -= vertex.0 as u32 * vertex.0 as u32;
-  }
-}
 
 #[derive(Clone)]
 pub struct GoGame {
@@ -158,14 +103,7 @@ impl GoGame {
       string_head[i] = Vertex(i as i16);
     }
 
-    let strings = vec![String{
-      color: stone::EMPTY,
-      num_stones: 0,
-
-      num_pseudo_liberties: 4,
-      liberty_vertex_sum: 32768, // 2 ^ 15
-      liberty_vertex_sum_squared: 2147483648, // 2 ^ 31
-    }; VIRT_LEN];
+    let strings = vec![String::new(); VIRT_LEN];
 
     let past_position_hashes = if cfg!(debug) {
       collections::HashSet::with_capacity(500)
@@ -341,10 +279,6 @@ impl GoGame {
 
   fn string(&self, vertex: Vertex) -> &String {
     return &self.strings[self.string_head[vertex.as_index()].as_index()];
-  }
-
-  fn num_pseudo_liberties(&self, vertex: Vertex) -> u8 {
-    return self.string(vertex).num_pseudo_liberties;
   }
 
   // Combines the groups around the newly placed stone at vertex. If no groups
