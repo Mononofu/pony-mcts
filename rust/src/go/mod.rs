@@ -1,3 +1,4 @@
+extern crate log;
 extern crate rand;
 
 use rand::Rng;
@@ -73,57 +74,37 @@ impl GoGame {
     }
 
     let mut rng = rand::thread_rng();
-
-    let mut board = vec![stone::BORDER; VIRT_LEN];
-    let mut hash = 0;
-    let mut vertex_hashes =  if cfg!(debug) { vec![0; 3 * board.len()] } else { vec![] };
-    let mut empty_vertices = Vec::with_capacity(size * size);
-    let mut empty_v_index = vec![0; VIRT_LEN];
+    let mut vertex_hashes =  if cfg!(debug) { vec![0; 3 * VIRT_LEN] } else { vec![] };
     for col in 0 .. size {
       for row in 0 .. size {
         if cfg!(debug) {
           vertex_hashes[0 * size * size + col + row * size] = rng.gen(); // EMPTY
           vertex_hashes[1 * size * size + col + row * size] = rng.gen(); // BLACK
           vertex_hashes[2 * size * size + col + row * size] = rng.gen(); // WHITE
-          // Create initial board hash.
-          hash = hash ^ vertex_hashes[0 * size * size + col + row * size];
         }
-
-        let v = GoGame::vertex(row as i16, col as i16);
-        board[v.as_index()] = stone::EMPTY;
-
-        empty_v_index[v.as_index()] = empty_vertices.len();
-        empty_vertices.push(v);
       }
     }
-
-
-    let mut string_head = vec![PASS; VIRT_LEN];
-    for i in 0 .. VIRT_LEN {
-      string_head[i] = Vertex(i as i16);
-    }
-
-    let strings = vec![String::new(); VIRT_LEN];
 
     let past_position_hashes = if cfg!(debug) {
       collections::HashSet::with_capacity(500)
     } else {
       collections::HashSet::new()
     };
-    GoGame {
+
+    let mut game = GoGame {
       size: size,
-      board: board,
+      board: vec![stone::BORDER; VIRT_LEN],
 
       vertex_hashes: vertex_hashes,
       past_position_hashes: past_position_hashes,
-      position_hash: hash,
+      position_hash: 0,
 
-      strings: strings,
-      string_head: string_head,
+      strings: vec![String::new(); VIRT_LEN],
+      string_head: vec![PASS; VIRT_LEN],
       string_next_v: vec![PASS; VIRT_LEN],
 
-      empty_vertices: empty_vertices,
-      empty_v_index: empty_v_index,
+      empty_vertices: Vec::with_capacity(size * size),
+      empty_v_index: vec![0; VIRT_LEN],
 
       num_black_stones: 0,
 
@@ -131,7 +112,9 @@ impl GoGame {
 
       to_play: stone::BLACK,
       history: Vec::with_capacity(500),
-    }
+    };
+    game.reset();
+    game
   }
 
   // Resets the game and clears the board. Same result as creating a new
@@ -160,9 +143,21 @@ impl GoGame {
 
         let v = GoGame::vertex(row as i16, col as i16);
         self.board[v.as_index()] = stone::EMPTY;
+        self.strings[v.as_index()].reset();
 
         self.empty_v_index[v.as_index()] = self.empty_vertices.len();
         self.empty_vertices.push(v);
+      }
+    }
+
+    for col in 0 .. self.size {
+      for row in 0 .. self.size {
+        let v = Vertex::new(row as i16, col as i16);
+        for n in NEIGHBOURS[v.as_index()].iter() {
+          if self.stone_at(*n) == stone::EMPTY {
+            self.strings[v.as_index()].add_liberty(*n);
+          }
+        }
       }
     }
 
@@ -223,7 +218,6 @@ impl GoGame {
       return false;
     }
 
-
     if vertex != PASS {
       // Preparation for ko checking.
       let old_num_empty_vertices = self.empty_vertices.len();
@@ -279,6 +273,10 @@ impl GoGame {
 
   fn string(&self, vertex: Vertex) -> &String {
     return &self.strings[self.string_head[vertex.as_index()].as_index()];
+  }
+
+  fn num_pseudo_liberties(&self, vertex: Vertex) -> u8 {
+    return self.string(vertex).num_pseudo_liberties;
   }
 
   // Combines the groups around the newly placed stone at vertex. If no groups
@@ -370,21 +368,17 @@ impl GoGame {
 
     loop {
       self.set_stone(stone::EMPTY, cur);
-      self.string_head[cur.as_index()] = cur;
-      self.strings[cur.as_index()].reset();
+      let next = self.string_next_v[cur.as_index()];
+      self.init_new_string(cur);
 
       for n in NEIGHBOURS[cur.as_index()].iter() {
-        let stone = self.board[n.as_index()];
-
-        if stone == stone::WHITE || stone == stone::BLACK {
-          let neighbour_string_head = self.string_head[n.as_index()];
-          if neighbour_string_head != string_head {
-            self.strings[neighbour_string_head.as_index()].add_liberty(cur);
-          }
+        let neighbour_string_head = self.string_head[n.as_index()];
+        if neighbour_string_head != string_head || self.stone_at(*n) == stone::EMPTY {
+          self.strings[neighbour_string_head.as_index()].add_liberty(cur);
         }
       }
 
-      cur = self.string_next_v[cur.as_index()];
+      cur = next;
       if cur == vertex {
         break;
       }
@@ -407,10 +401,8 @@ impl GoGame {
 
     // Can definitely play if the placed stone will have at least one direct
     // freedom (can't be ko).
-    for n in NEIGHBOURS[vertex.as_index()].iter() {
-      if self.stone_at(*n) == stone::EMPTY {
-        return true;
-      }
+    if self.string(vertex).num_pseudo_liberties > 0 {
+      return true;
     }
 
     // For all checks below, the newly placed stone is completely surrounded by
@@ -521,7 +513,7 @@ impl GoGame {
 
 impl fmt::Display for GoGame {
   fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-    let column_labels = "ABCDEFGHIJKLMNOPORST";
+    let column_labels = "ABCDEFGHJKLMNOPORST";
     try!(write!(f, "\x1b[0;37m    "));
     for col in 0 .. self.size {
       try!(write!(f, " {}", column_labels.chars().nth(col).unwrap()));

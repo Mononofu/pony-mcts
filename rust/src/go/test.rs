@@ -92,7 +92,7 @@ fn freedoms_after_capture() {
 
 #[test]
 fn initially_all_moves_possible() {
-  let mut game = GoGame::new(9);
+  let game = GoGame::new(9);
   assert_eq!(game.possible_moves(stone::BLACK).len(), 81);
 }
 
@@ -125,7 +125,7 @@ fn forbid_filling_real_eyes_of_split_group() {
 #[test]
 fn uniform_move_distribution() {
   let mut rng = rand::StdRng::from_seed(&[42]);
-  let mut game = GoGame::new(9);
+  let game = GoGame::new(9);
   let num_valid_moves = game.possible_moves(stone::BLACK).len() as f64;
   let num_samples = 100000;
   let mut count = vec![0; VIRT_LEN];
@@ -159,7 +159,6 @@ fn chinese_score_also_count_eyes() {
   }
   assert_eq!(9*9, game.chinese_score());
 }
-
 
 #[test]
 fn reset_game() {

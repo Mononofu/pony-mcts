@@ -38,7 +38,7 @@ fn main() {
   // let mut rng = rand::StdRng::from_seed(&[time::precise_time_ns() as usize]);
   let rng = rand::StdRng::from_seed(&[42]);
 
-  benchmark(run_rollouts, 10000, 3);
+  benchmark(run_rollouts, 10000, 11);
 
   let mut engine = gtp::Engine::new(rng);
   let stdin = io::stdin();
