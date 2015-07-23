@@ -86,7 +86,7 @@ impl GoGame {
     }
 
     let past_position_hashes = if cfg!(debug) {
-      collections::HashSet::with_capacity(500)
+      collections::HashSet::with_capacity(600)
     } else {
       collections::HashSet::new()
     };
@@ -111,7 +111,7 @@ impl GoGame {
       ko_vertex: PASS,
 
       to_play: stone::BLACK,
-      history: Vec::with_capacity(500),
+      history: Vec::with_capacity(600),
     };
     game.reset();
     game
