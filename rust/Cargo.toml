@@ -9,6 +9,7 @@ authors = [ "Julian Schrittwieser <mcts@furidamu.org>" ]
 log="*"
 rand="*"
 time="*"
+vec_map="*"
 
 [profile.release]
 opt-level = 3

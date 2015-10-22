@@ -36,12 +36,6 @@ pub struct GoGame {
   // calculation.
   board: Vec<Stone>,
 
-  // Zobrist hashing for tracking super-ko and debugging normal ko checking.
-  // Disabled in release mode for better performance.
-  vertex_hashes: Vec<u64>,
-  past_position_hashes: collections::HashSet<u64>,
-  position_hash: u64,
-
   strings: Vec<String>,
   // Head of the string for every vertex of the board.
   string_head: Vec<Vertex>,
@@ -73,31 +67,9 @@ impl GoGame {
         size, MAX_SIZE);
     }
 
-    let mut rng = rand::thread_rng();
-    let mut vertex_hashes =  if cfg!(debug) { vec![0; 3 * VIRT_LEN] } else { vec![] };
-    for col in 0 .. size {
-      for row in 0 .. size {
-        if cfg!(debug) {
-          vertex_hashes[0 * size * size + col + row * size] = rng.gen(); // EMPTY
-          vertex_hashes[1 * size * size + col + row * size] = rng.gen(); // BLACK
-          vertex_hashes[2 * size * size + col + row * size] = rng.gen(); // WHITE
-        }
-      }
-    }
-
-    let past_position_hashes = if cfg!(debug) {
-      collections::HashSet::with_capacity(600)
-    } else {
-      collections::HashSet::new()
-    };
-
     let mut game = GoGame {
       size: size,
       board: vec![stone::BORDER; VIRT_LEN],
-
-      vertex_hashes: vertex_hashes,
-      past_position_hashes: past_position_hashes,
-      position_hash: 0,
 
       strings: vec![String::new(); VIRT_LEN],
       string_head: vec![PASS; VIRT_LEN],
@@ -121,7 +93,6 @@ impl GoGame {
   // instance, but this doesn't need to allocate any memory.
   pub fn reset(&mut self) {
     self.empty_vertices.clear();
-    self.past_position_hashes.clear();
     self.num_black_stones = 0;
     self.ko_vertex = PASS;
     self.to_play = stone::BLACK;
@@ -133,14 +104,8 @@ impl GoGame {
       self.string_next_v[i] = PASS;
     }
 
-    let mut hash = 0;
-
     for col in 0 .. self.size {
       for row in 0 .. self.size {
-        if cfg!(debug) {
-          hash = hash ^ self.vertex_hashes[0 * self.size * self.size + col + row * self.size];
-        }
-
         let v = GoGame::vertex(row as i16, col as i16);
         self.board[v.as_index()] = stone::EMPTY;
         self.strings[v.as_index()].reset();
@@ -160,37 +125,16 @@ impl GoGame {
         }
       }
     }
-
-    self.position_hash = hash;
   }
 
   pub fn vertex(x: i16, y: i16) -> Vertex {
     Vertex::new(x, y)
   }
 
-  // Calculates zobrist hash for a vertex. Used for super-ko detection.
-  fn hash_for(&self, vertex: Vertex) -> u64 {
-    let offset = match self.stone_at(vertex) {
-      stone::EMPTY => 0,
-      stone::BLACK => 1,
-      stone::WHITE => 2,
-      stone::BORDER => 3,
-      _ => panic!("unknown stone"),
-    };
-    return self.vertex_hashes[offset * self.size * self.size + vertex.as_index()];
-  }
-
   fn set_stone(&mut self, stone: Stone, vertex: Vertex) {
     let old_stone = self.board[vertex.as_index()];
-    // Remove hash for old stone.
-    if cfg!(debug) {
-      self.position_hash = self.position_hash ^ self.hash_for(vertex);
-    }
-    // Place new stone and apply hash for it.
+    // Place new stone..
     self.board[vertex.as_index()] = stone;
-    if cfg!(debug) {
-      self.position_hash = self.position_hash ^ self.hash_for(vertex);
-    }
 
     // Update empty vertex list.
     if stone == stone::EMPTY {
@@ -245,10 +189,19 @@ impl GoGame {
       self.ko_vertex = *self.empty_vertices.last().unwrap();
     }
 
-    if cfg!(debug) {
-      self.check_ko();
-    }
+    return true;
+  }
 
+  pub fn undo(&mut self, num_moves: usize) -> bool {
+    if num_moves > self.history.len() {
+      return false;
+    }
+    let history = self.history.clone();
+    self.reset();
+    for i in 0 .. num_moves {
+      let to_play = self.to_play;
+      self.play(to_play, history[i]);
+    }
     return true;
   }
 
@@ -264,13 +217,6 @@ impl GoGame {
         self.remove_group(*n);
       }
     }
-  }
-
-  fn check_ko(&mut self) {
-    if self.past_position_hashes.contains(&self.position_hash) {
-      println!("missed ko!");
-    }
-    self.past_position_hashes.insert(self.position_hash);
   }
 
   fn string(&self, vertex: Vertex) -> &String {

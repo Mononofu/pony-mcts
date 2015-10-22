@@ -34,7 +34,7 @@ impl Engine {
 
     Engine {
       game: GoGame::new(9),
-      controller: Controller::new(),
+      controller: Controller::new(9),
       rng: rng,
       commands: commands,
       analyze_commands: analyze_commands,
@@ -87,15 +87,15 @@ impl Engine {
   }
 
   fn move_values(&mut self, _: Vec<&str>) -> Result<String, String> {
-    let num_simulations = 100000;
-    self.controller.gen_move(&self.game, num_simulations, &mut self.rng);
+    // let num_simulations = 100000;
+    // self.controller.gen_move(&self.game, num_simulations, &mut self.rng);
     let mut res = "".to_string();
-    for c in self.controller.root.children.iter() {
-      res.push_str(&format!("COLOR #0000{:02x} {}\n",
-        (c.uct(num_simulations) * 255f64) as u8, c.vertex));
-      res.push_str(&format!("LABEL {} {}\n", c.vertex,
-        (c.uct(num_simulations) * 100f64) as u8));
-    }
+    // for c in self.controller.root.children.iter() {
+    //   res.push_str(&format!("COLOR #0000{:02x} {}\n",
+    //     (c.uct(num_simulations) * 255f64) as u8, c.vertex));
+    //   res.push_str(&format!("LABEL {} {}\n", c.vertex,
+    //     (c.uct(num_simulations) * 100f64) as u8));
+    // }
     Ok(res)
   }
 
