@@ -25,7 +25,7 @@ const MAX_SIZE: u8 = 19;
 // This includes a one stone border on all sides of the board.
 const VIRT_SIZE: u8 = MAX_SIZE + 2;
 // Length of an array/vector necessary to store the virtual board.
-const VIRT_LEN: usize = VIRT_SIZE as usize * VIRT_SIZE as usize;
+pub const VIRT_LEN: usize = VIRT_SIZE as usize * VIRT_SIZE as usize;
 
 
 #[derive(Clone)]

@@ -77,7 +77,7 @@ impl Engine {
     let start = time::PreciseTime::now();
     let color = try!(args[1].parse::<Stone>());
     self.game.to_play = color;
-    let num_simulations = 50000;
+    let num_simulations = 10000;
     let v = self.controller.gen_move(&self.game, num_simulations, &mut self.rng);
     self.game.play(color, v);
     let duration = start.to(time::PreciseTime::now());
@@ -87,13 +87,14 @@ impl Engine {
   }
 
   fn move_values(&mut self, _: Vec<&str>) -> Result<String, String> {
-    self.controller.gen_move(&self.game, 100000, &mut self.rng);
+    let num_simulations = 100000;
+    self.controller.gen_move(&self.game, num_simulations, &mut self.rng);
     let mut res = "".to_string();
     for c in self.controller.root.children.iter() {
       res.push_str(&format!("COLOR #0000{:02x} {}\n",
-        (c.uct(20000, 0f64) * 255f64) as u8, c.vertex));
+        (c.uct(num_simulations) * 255f64) as u8, c.vertex));
       res.push_str(&format!("LABEL {} {}\n", c.vertex,
-        (c.uct(20000, 0f64) * 100f64) as u8));
+        (c.uct(num_simulations) * 100f64) as u8));
     }
     Ok(res)
   }
@@ -108,7 +109,7 @@ impl Engine {
   }
 
   fn name(&mut self, _: Vec<&str>) -> Result<String, String> {
-    Ok("rust_mcts".to_string())
+    Ok("ErGo".to_string())
   }
 
   fn clear_board(&mut self, _: Vec<&str>) -> Result<String, String> {

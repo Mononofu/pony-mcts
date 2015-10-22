@@ -6,9 +6,14 @@ use go::PASS;
 use go::GoGame;
 use go::Stone;
 use go::stone;
+use go::VIRT_LEN;
+use rand::Rng;
 
-const EXPANSION_THRESHOLD: u32 = 4;
+const EXPANSION_THRESHOLD: u32 = 8;
+const NODE_PRIOR: u32 = 10;
 const UCT_C: f64 = 1.4;
+const RAVE_C: f64 = 0.0;
+const RAVE_EQUIV: f64 = 3500.0;
 
 pub struct Node {
   player: Stone,
@@ -16,14 +21,17 @@ pub struct Node {
   pub children: Vec<Node>,
 
   num_plays: u32,
-  num_wins: i32,
+  num_wins: u32,
+  num_rave_plays: u32,
+  num_rave_wins: u32,
 }
 
 pub struct Controller {
   pub root: Node,
 }
 
-fn black_wins(game: &mut GoGame, last_move: Stone, rng: &mut rand::StdRng) -> bool {
+fn black_wins(game: &mut GoGame, last_move: Stone, rng: &mut rand::StdRng,
+      amaf_color_map: &mut Vec<Stone>) -> bool {
   let double_komi = 13;
   let mut color_to_play = last_move;
   let mut num_consecutive_passes = 0;
@@ -36,6 +44,9 @@ fn black_wins(game: &mut GoGame, last_move: Stone, rng: &mut rand::StdRng) -> bo
     if v == PASS {
       num_consecutive_passes += 1;
     } else {
+      if amaf_color_map[v.as_index()] == stone::EMPTY {
+        amaf_color_map[v.as_index()] = color_to_play;
+      }
       game.play(color_to_play, v);
       num_consecutive_passes = 0;
     }
@@ -44,7 +55,7 @@ fn black_wins(game: &mut GoGame, last_move: Stone, rng: &mut rand::StdRng) -> bo
       return false;
     }
   }
-  return game.chinese_score() * 2 - double_komi > 0;
+  return game.chinese_score() * 2 > double_komi;
 }
 
 impl Controller {
@@ -67,12 +78,14 @@ impl Controller {
         let to_play = rollout_game.to_play;
         rollout_game.play(to_play, *v);
       }
-      self.root.run_rollout(i, &mut rollout_game, rng);
+      // Map to store who played at which vertex first to update node values by AMAF.
+      let mut amaf_color_map = vec![stone::EMPTY; VIRT_LEN];
+      self.root.run_rollout(i, &mut rollout_game, rng, &mut amaf_color_map);
     }
     if self.root.children.is_empty() {
       return PASS;
     }
-    self.root.best_child(num_rollouts, 0f64).vertex
+    self.root.best_move().vertex
   }
 }
 
@@ -83,15 +96,21 @@ impl Node {
       vertex: vertex,
       children: vec![],
 
-      num_plays: 2,
-      num_wins: 1,
+      num_plays: NODE_PRIOR,
+      num_wins: NODE_PRIOR / 2,
+      num_rave_plays: 0,
+      num_rave_wins: 0,
     }
   }
 
   // Returns whether black wins to update the win rate in parent nodes.
-  fn run_rollout(&mut self, num_sims: u32, game: &mut GoGame, rng: &mut rand::StdRng) -> bool {
+  fn run_rollout(&mut self, num_sims: u32, game: &mut GoGame,
+      rng: &mut rand::StdRng, amaf_color_map: &mut Vec<Stone>) -> bool {
     game.play(self.player, self.vertex);
     self.num_plays += 1;
+    if self.vertex != PASS && amaf_color_map[self.vertex.as_index()] == stone::EMPTY {
+      amaf_color_map[self.vertex.as_index()] = self.player;
+    }
 
     let black_wins = if self.children.is_empty() {
       if self.num_plays > EXPANSION_THRESHOLD {
@@ -99,26 +118,49 @@ impl Node {
         for v in game.possible_moves(opponent) {
           self.children.push(Node::new(opponent, v));
         }
+        rng.shuffle(&mut self.children);
       }
 
-      black_wins(game, self.player, rng)
+      black_wins(game, self.player, rng, amaf_color_map)
     } else {
-      self.best_child(num_sims, UCT_C).run_rollout(num_sims, game, rng)
+      self.best_child(num_sims).run_rollout(num_sims, game, rng, amaf_color_map)
     };
 
-    if black_wins && self.player == stone::BLACK {
-      self.num_wins += 1;
-    } else if !black_wins && self.player == stone::WHITE {
-      self.num_wins += 1;
+
+    let wins = if black_wins && self.player == stone::BLACK ||
+      !black_wins && self.player == stone::WHITE {
+      1
+    } else {
+      0
+    };
+    self.num_wins += wins;
+
+    for c in self.children.iter_mut() {
+      if amaf_color_map[c.vertex.as_index()] == c.player {
+        c.num_rave_plays += 1;
+        c.num_rave_wins += 1 - wins; // Children are from the other perspective.
+      }
     }
     return black_wins;
   }
 
-  fn best_child(&mut self, num_sims: u32, uct_constant: f64) -> &mut Node {
+  fn best_move(&self) -> &Node {
+    let mut max_visits = 0;
+    let mut best_child = 0;
+    for i in 0 .. self.children.len() {
+      if self.children[i].num_plays > max_visits {
+        best_child = i;
+        max_visits = self.children[i].num_plays;
+      }
+    }
+    &self.children[best_child]
+  }
+
+  fn best_child(&mut self, num_sims: u32) -> &mut Node {
     let mut best_value = -1f64;
     let mut best_child = 0;
     for i in 0 .. self.children.len() {
-      let value = self.children[i].uct(num_sims, uct_constant);
+      let value = self.children[i].rave_urgency();
       if value > best_value {
         best_value = value;
         best_child = i;
@@ -127,8 +169,23 @@ impl Node {
     &mut self.children[best_child]
   }
 
-  pub fn uct(&self, num_sims: u32, uct_constant: f64) -> f64 {
+  pub fn uct(&self, num_sims: u32) -> f64 {
     self.num_wins as f64 / self.num_plays as f64 +
-        uct_constant * ((num_sims as f64).ln() / self.num_plays as f64).sqrt()
+        UCT_C * ((num_sims as f64).ln() / self.num_plays as f64).sqrt() +
+        RAVE_C * (self.num_rave_wins as f64 / self.num_rave_plays as f64)
+  }
+
+  fn rave_urgency(&self) -> f64 {
+    let value = self.num_wins as f64 / self.num_plays as f64;
+    if self.num_rave_plays == 0 {
+      return value;
+    }
+
+    let rave_value = self.num_rave_wins as f64 / self.num_rave_plays as f64;
+    let beta = self.num_rave_plays as f64 / (
+      self.num_rave_plays as f64 + self.num_plays as f64 +
+      (self.num_rave_plays + self.num_plays) as f64 / RAVE_EQUIV);
+    return beta * rave_value + (1.0 - beta) * value
+
   }
 }
