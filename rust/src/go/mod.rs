@@ -2,6 +2,7 @@ extern crate log;
 extern crate rand;
 
 use rand::Rng;
+use std::cmp;
 use std::fmt;
 use std::collections;
 
@@ -23,14 +24,14 @@ pub use self::string::String;
 const MAX_SIZE: u8 = 19;
 // Size of the virtual board necessary to support a board of MAX_SIZE.
 // This includes a one stone border on all sides of the board.
-const VIRT_SIZE: u8 = MAX_SIZE + 2;
+pub const VIRT_SIZE: u8 = MAX_SIZE + 2;
 // Length of an array/vector necessary to store the virtual board.
 pub const VIRT_LEN: usize = VIRT_SIZE as usize * VIRT_SIZE as usize;
 
 
 #[derive(Clone)]
 pub struct GoGame {
-  size: usize,
+  pub size: usize,
   // Board of stones with a 1-stone border on all sides to remove the need for
   // bound checking. Laid out as 1D vector, see GoGame::vertex for index
   // calculation.
@@ -57,7 +58,7 @@ pub struct GoGame {
   ko_vertex: Vertex,
 
   pub to_play: Stone,
-  pub history: Vec<Vertex>,
+  pub history: Vec<(Stone, Vertex)>,
 }
 
 impl GoGame {
@@ -141,6 +142,9 @@ impl GoGame {
       self.empty_v_index[vertex.as_index()] = self.empty_vertices.len();
       self.empty_vertices.push(vertex);
     } else {
+      if old_stone != stone::EMPTY {
+        println!("not empty!");
+      }
       let i = self.empty_v_index[vertex.as_index()];
       {
         let last = self.empty_vertices.last().unwrap();
@@ -163,7 +167,7 @@ impl GoGame {
     }
 
     self.to_play = stone.opponent();
-    self.history.push(vertex);
+    self.history.push((stone, vertex));
 
     if vertex == PASS {
       return true;
@@ -198,9 +202,10 @@ impl GoGame {
     }
     let history = self.history.clone();
     self.reset();
-    for i in 0 .. num_moves {
-      let to_play = self.to_play;
-      self.play(to_play, history[i]);
+    // println!("{:?}", self);
+    for i in 0 .. (history.len() - num_moves) {
+      // println!("replaying {:} {:}", history[i].0, history[i].1);
+      self.play(history[i].0, history[i].1);
     }
     return true;
   }
@@ -405,6 +410,9 @@ impl GoGame {
 
   pub fn random_move(&self, stone: Stone, rng: &mut rand::StdRng) -> Vertex {
     let num_empty = self.empty_vertices.len();
+    if num_empty == 0 {
+      return PASS;
+    }
     let start_vertex = rng.gen_range(0, num_empty);
     let mut i = start_vertex;
 
@@ -522,6 +530,29 @@ impl fmt::Debug for GoGame {
     }
 
     return write!(f, "");
+  }
+}
+
+impl cmp::PartialEq for GoGame {
+  fn eq(&self, other: &GoGame) -> bool {
+    if self.size != other.size { 
+      return false;
+    }
+
+    if self.ko_vertex != other.ko_vertex {
+      return false;
+    }
+
+    for col in 0 .. self.size {
+      for row in 0 .. self.size {
+        let v = Vertex::new(row as i16, col as i16);
+        if self.stone_at(v) != other.stone_at(v) {
+          return false;
+        }
+      }
+    }
+
+    return true;
   }
 }
 

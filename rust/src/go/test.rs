@@ -180,3 +180,20 @@ fn parse_vertex() {
   }
   assert_eq!(PASS, format!("{}", PASS).parse::<Vertex>().unwrap());
 }
+
+#[test]
+fn can_undo() {
+  let mut game = GoGame::new(9);
+  game.play(stone::BLACK, GoGame::vertex(0, 0));
+  game.play(stone::WHITE, GoGame::vertex(1, 0));
+  game.play(stone::BLACK, GoGame::vertex(4, 4));
+  let mut second_game = game.clone();
+
+  game.play(stone::WHITE, GoGame::vertex(0, 1));
+  game.undo(1);
+  assert_eq!(format!("{:?}", second_game), format!("{:?}", game));
+
+  game.play(stone::WHITE, GoGame::vertex(0, 1));
+  second_game.play(stone::WHITE, GoGame::vertex(0, 1));
+  assert_eq!(format!("{:?}", second_game), format!("{:?}", game));
+}

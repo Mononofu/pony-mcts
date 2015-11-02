@@ -4,6 +4,12 @@ v 0.1: full implementation of the Go rules, including ko detection. Supports com
 
 # MCTS for Go in Rust
 
+other engines:
+- https://github.com/ujh/iomrascalai
+- https://github.com/pasky/michi/blob/master/michi.py
+
+v 0.2: basic MCTS, still almost always loses to GnuGo 
+
 For comparison, [libego](https://github.com/lukaszlew/libego) does about 7.6 k playouts / second, or 0.13 ms per playout.
 
 - 2015-07-12: using a static lookup table for converting to opponent color brings a large speedup again! Now it's definitely faster than libego, only 0.085 ms per playout, or 11.7 k playouts / second.

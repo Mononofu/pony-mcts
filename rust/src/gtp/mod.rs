@@ -34,7 +34,7 @@ impl Engine {
 
     Engine {
       game: GoGame::new(9),
-      controller: Controller::new(9),
+      controller: Controller::new(),
       rng: rng,
       commands: commands,
       analyze_commands: analyze_commands,
